@@ -1,0 +1,12 @@
+- generic [ref=e4]:
+  - heading "STARVEIL" [level=1] [ref=e5]
+  - paragraph [ref=e6]: Space Empire Simulation
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]: Email
+      - textbox "commander@starveil.io" [ref=e10]
+    - generic [ref=e11]:
+      - generic [ref=e12]: Password
+      - textbox "••••••••" [ref=e13]
+    - button "Sign In" [ref=e14]
+  - button "New commander? Create a colony" [ref=e15]
