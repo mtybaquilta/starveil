@@ -3,8 +3,6 @@ import { getBuildingConfig } from '../config/buildings'
 import { productionPerHour, energyConsumption } from '../config/formulas'
 import type { GameContext } from '../components/Layout'
 
-const BASE_STORAGE = 10000
-
 export function ResourcesPage() {
   const { buildings, resources } = useOutletContext<GameContext>()
 
