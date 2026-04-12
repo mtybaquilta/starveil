@@ -80,42 +80,26 @@ function FleetCard({
   return (
     <div className={`bg-slate-800/40 rounded-xl border border-slate-700/20 overflow-hidden flex flex-col transition-opacity ${count === 0 ? 'opacity-40' : ''}`}>
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 flex items-start justify-between">
-        <div>
-          <div className="text-sm font-bold text-slate-100">{ship.name}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">{ship.description}</div>
-        </div>
-        <div className="text-right shrink-0 ml-3">
-          <div className={`text-2xl font-bold ${count > 0 ? 'text-slate-100' : 'text-slate-600'}`}>
-            {available}
-          </div>
-          <div className="text-[10px] text-slate-500 leading-none">available</div>
-          {deployed > 0 && (
-            <div className="text-[10px] text-indigo-400 mt-0.5">{deployed} deployed</div>
-          )}
-        </div>
+      <div className="px-4 pt-4 pb-3">
+        <div className="text-sm font-bold text-slate-100">{ship.name}</div>
+        <div className="text-[11px] text-slate-500 mt-0.5 leading-relaxed flex-1">{ship.description}</div>
       </div>
 
       {/* Full-width image */}
       <img src={ship.image} alt={ship.name} className="w-full h-36 object-cover" />
 
-      {/* Stats */}
-      <div className="px-4 py-3 grid grid-cols-2 gap-x-4 gap-y-1 mt-auto">
-        <div className="flex justify-between text-[11px]">
-          <span className="text-slate-500">Speed</span>
-          <span className="text-slate-300 font-medium">{ship.stats.speed}</span>
+      {/* Counts */}
+      <div className="px-4 py-3 flex items-center justify-between mt-auto">
+        <div>
+          <div className={`text-2xl font-bold ${count > 0 ? 'text-slate-100' : 'text-slate-600'}`}>{available}</div>
+          <div className="text-[10px] text-slate-500">available</div>
         </div>
-        <div className="flex justify-between text-[11px]">
-          <span className="text-slate-500">Cargo</span>
-          <span className="text-slate-300 font-medium">{ship.stats.cargoCapacity.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between text-[11px]">
-          <span className="text-slate-500">Attack</span>
-          <span className="text-slate-300 font-medium">{ship.stats.attackPower}</span>
-        </div>
-        <div className="flex justify-between text-[11px]">
-          <span className="text-slate-500">Defense</span>
-          <span className="text-slate-300 font-medium">{ship.stats.defenseRating}</span>
+        <div className="text-right">
+          <div className="text-sm font-semibold text-slate-400">{count}</div>
+          <div className="text-[10px] text-slate-500">total</div>
+          {deployed > 0 && (
+            <div className="text-[10px] text-indigo-400 mt-0.5">{deployed} on mission</div>
+          )}
         </div>
       </div>
     </div>
