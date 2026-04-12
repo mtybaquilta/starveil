@@ -129,7 +129,7 @@ function ShipCard({
   }
 
   return (
-    <div className="bg-slate-800/40 rounded-xl border border-slate-700/20 overflow-hidden">
+    <div className="bg-slate-800/40 rounded-xl border border-slate-700/20 overflow-hidden flex flex-col">
       {/* Header */}
       <div className="px-4 pt-4 pb-3">
         <div className="text-sm font-bold text-slate-100">{ship.name}</div>
@@ -140,8 +140,8 @@ function ShipCard({
       <img src={ship.image} alt={ship.name} className="w-full h-36 object-cover" />
 
       {/* Body */}
-      <div className="px-4 pt-3 pb-4 space-y-3">
-        <p className="text-[11px] text-slate-400 leading-relaxed">{ship.description}</p>
+      <div className="px-4 pt-3 pb-4 flex flex-col flex-1 gap-3">
+        <p className="text-[11px] text-slate-400 leading-relaxed flex-1">{ship.description}</p>
 
         {/* Stats — 4-column: label value | label value */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
