@@ -32,7 +32,7 @@ function visibilityClass(entry: GalaxyMapEntry): string {
 }
 
 export function GalaxyMapPage() {
-  const { galaxyMap, buildings, refetch } = useOutletContext<GameContext>()
+  const { planet, galaxyMap, buildings, refetch } = useOutletContext<GameContext>()
   const [selected, setSelected] = useState<GalaxyMapEntry | null>(null)
   const [sending, setSending] = useState(false)
 
@@ -42,7 +42,7 @@ export function GalaxyMapPage() {
     setSending(true)
     try {
       const { data, error } = await supabase.functions.invoke('game-action', {
-        body: { action: 'send_probe', targetCoords: coords },
+        body: { action: 'send_probe', planetId: planet.id, targetCoords: coords },
       })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
@@ -60,7 +60,7 @@ export function GalaxyMapPage() {
     setSending(true)
     try {
       const { data, error } = await supabase.functions.invoke('game-action', {
-        body: { action: 'run_radar' },
+        body: { action: 'run_radar', planetId: planet.id },
       })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
