@@ -46,40 +46,76 @@ export function FleetPage() {
       )}
 
       {/* Fleet Roster */}
-      <div className="bg-slate-800/30 rounded-xl p-5 border border-slate-700/10">
-        <h2 className="text-sm font-semibold text-slate-200 mb-4">Fleet Roster</h2>
-        <div className="space-y-3">
-          {SHIPS.map((ship) => {
-            const count = fleetCounts.get(ship.id) ?? 0
-            const deployed = deployedCounts.get(ship.id) ?? 0
-            const available = count - deployed
-            return (
-              <div
-                key={ship.id}
-                className={`flex items-center gap-4 py-3 border-b border-slate-700/10 last:border-0 ${count === 0 ? 'opacity-40' : ''}`}
-              >
-                <span className="text-2xl">{ship.icon}</span>
-                <div className="flex-1">
-                  <div className="text-xs font-semibold text-slate-200">{ship.name}</div>
-                  <div className="flex gap-3 mt-1">
-                    <StatBadge label="Speed" value={ship.stats.speed} />
-                    <StatBadge label="Cargo" value={ship.stats.cargoCapacity.toLocaleString()} />
-                    <StatBadge label="Atk" value={ship.stats.attackPower} />
-                    <StatBadge label="Def" value={ship.stats.defenseRating} />
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className={`text-lg font-bold ${count > 0 ? 'text-slate-100' : 'text-slate-600'}`}>
-                    {available}
-                  </div>
-                  <div className="text-[10px] text-slate-500">available</div>
-                  {deployed > 0 && (
-                    <div className="text-[10px] text-indigo-400">{deployed} deployed</div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+      <div className="grid grid-cols-3 gap-4">
+        {SHIPS.map((ship) => {
+          const count = fleetCounts.get(ship.id) ?? 0
+          const deployed = deployedCounts.get(ship.id) ?? 0
+          const available = count - deployed
+          return (
+            <FleetCard
+              key={ship.id}
+              ship={ship}
+              count={count}
+              available={available}
+              deployed={deployed}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function FleetCard({
+  ship,
+  count,
+  available,
+  deployed,
+}: {
+  ship: (typeof SHIPS)[number]
+  count: number
+  available: number
+  deployed: number
+}) {
+  return (
+    <div className={`bg-slate-800/40 rounded-xl border border-slate-700/20 overflow-hidden flex flex-col transition-opacity ${count === 0 ? 'opacity-40' : ''}`}>
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 flex items-start justify-between">
+        <div>
+          <div className="text-sm font-bold text-slate-100">{ship.name}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{ship.description}</div>
+        </div>
+        <div className="text-right shrink-0 ml-3">
+          <div className={`text-2xl font-bold ${count > 0 ? 'text-slate-100' : 'text-slate-600'}`}>
+            {available}
+          </div>
+          <div className="text-[10px] text-slate-500 leading-none">available</div>
+          {deployed > 0 && (
+            <div className="text-[10px] text-indigo-400 mt-0.5">{deployed} deployed</div>
+          )}
+        </div>
+      </div>
+
+      {/* Full-width image */}
+      <img src={ship.image} alt={ship.name} className="w-full h-36 object-cover" />
+
+      {/* Stats */}
+      <div className="px-4 py-3 grid grid-cols-2 gap-x-4 gap-y-1 mt-auto">
+        <div className="flex justify-between text-[11px]">
+          <span className="text-slate-500">Speed</span>
+          <span className="text-slate-300 font-medium">{ship.stats.speed}</span>
+        </div>
+        <div className="flex justify-between text-[11px]">
+          <span className="text-slate-500">Cargo</span>
+          <span className="text-slate-300 font-medium">{ship.stats.cargoCapacity.toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between text-[11px]">
+          <span className="text-slate-500">Attack</span>
+          <span className="text-slate-300 font-medium">{ship.stats.attackPower}</span>
+        </div>
+        <div className="flex justify-between text-[11px]">
+          <span className="text-slate-500">Defense</span>
+          <span className="text-slate-300 font-medium">{ship.stats.defenseRating}</span>
         </div>
       </div>
     </div>
@@ -95,13 +131,5 @@ function ProgressBar({ startedAt, completesAt, timeRemaining }: { startedAt: str
       className="h-full bg-gradient-to-r from-sky-500 to-cyan-500 rounded-full transition-all duration-1000"
       style={{ width: `${progress}%` }}
     />
-  )
-}
-
-function StatBadge({ label, value }: { label: string; value: number | string }) {
-  return (
-    <span className="text-[10px] text-slate-500">
-      {label}: <span className="text-slate-400">{value}</span>
-    </span>
   )
 }
