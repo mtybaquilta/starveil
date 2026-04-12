@@ -20,7 +20,7 @@ export function LoginPage() {
 
     try {
       if (isSignUp) {
-        await signUp(email, password, username)
+        // await signUp(email, password, username)
       } else {
         await signIn(email, password)
       }
