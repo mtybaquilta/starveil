@@ -118,73 +118,82 @@ function ShipCard({
 
   if (isLocked) {
     return (
-      <div className="p-4 bg-slate-800/20 rounded-xl border border-dashed border-slate-700/30">
-        <section className={`p-12 bg-[url('${ship.image}')] bg-contain bg-no-repeat`}></section>
-        <div className="text-xs font-semibold text-slate-600 mb-1 mt-1">{ship.name}</div>
-        <div className="text-[10px] text-slate-700">Requires {lockReason}</div>
+      <div className="bg-slate-800/20 rounded-xl border border-dashed border-slate-700/30 overflow-hidden">
+        <div className="px-4 pt-4 pb-2">
+          <div className="text-sm font-bold text-slate-600">{ship.name}</div>
+        </div>
+        <img src={ship.image} alt={ship.name} className="w-full h-36 object-cover opacity-30 grayscale" />
+        <div className="px-4 py-3 text-[11px] text-slate-600">Requires {lockReason}</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/10">
-      <div className="flex items-center gap-2 mb-3">
-        <div>
-          <div className="text-xs font-semibold text-slate-200">{ship.name}</div>
-          <div className="text-[10px] text-slate-500">Fleet: {fleetCount}</div>
+    <div className="bg-slate-800/40 rounded-xl border border-slate-700/20 overflow-hidden">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3">
+        <div className="text-sm font-bold text-slate-100">{ship.name}</div>
+        <div className="text-[11px] text-slate-500 mt-0.5">Fleet: {fleetCount}</div>
+      </div>
+
+      {/* Full-width image */}
+      <img src={ship.image} alt={ship.name} className="w-full h-36 object-cover" />
+
+      {/* Body */}
+      <div className="px-4 pt-3 pb-4 space-y-3">
+        <p className="text-[11px] text-slate-400 leading-relaxed">{ship.description}</p>
+
+        {/* Stats — 4-column: label value | label value */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <div className="flex justify-between text-[11px]">
+            <span className="text-slate-500">Speed</span>
+            <span className="text-slate-200 font-medium">{ship.stats.speed}</span>
+          </div>
+          <div className="flex justify-between text-[11px]">
+            <span className="text-slate-500">Cargo</span>
+            <span className="text-slate-200 font-medium">{ship.stats.cargoCapacity.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between text-[11px]">
+            <span className="text-slate-500">Attack</span>
+            <span className="text-slate-200 font-medium">{ship.stats.attackPower}</span>
+          </div>
+          <div className="flex justify-between text-[11px]">
+            <span className="text-slate-500">Defense</span>
+            <span className="text-slate-200 font-medium">{ship.stats.defenseRating}</span>
+          </div>
         </div>
+
+        {/* Cost */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-[11px]">
+            <div className={`w-2 h-2 rounded-full ${metal >= ship.cost.metal ? 'bg-orange-400' : 'bg-red-500'}`} />
+            <span className={metal >= ship.cost.metal ? 'text-slate-300' : 'text-red-400'}>
+              {ship.cost.metal.toLocaleString()}
+            </span>
+          </div>
+          {ship.cost.gas > 0 && (
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <div className={`w-2 h-2 rounded-full ${gas >= ship.cost.gas ? 'bg-violet-400' : 'bg-red-500'}`} />
+              <span className={gas >= ship.cost.gas ? 'text-slate-300' : 'text-red-400'}>
+                {ship.cost.gas.toLocaleString()}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="text-[11px] text-slate-500">
+          Build time: {formatTime(buildTime * 1000)}
+        </div>
+
+        <button
+          onClick={handleBuild}
+          disabled={!canBuild}
+          className="w-full py-2.5 bg-sky-500 hover:bg-sky-400 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
+        >
+          {queueFull ? 'Queue Full' : !canAfford ? 'Insufficient Resources' : 'Build →'}
+        </button>
       </div>
-
-      <section className={`p-12 bg-[url('${ship.image}')] bg-contain bg-no-repeat`}></section>
-
-      <p className="text-[10px] text-slate-500 mb-4 mt-2 leading-relaxed">{ship.description}</p>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-0 mb-1">
-        <StatPill label="Speed" value={ship.stats.speed} />
-        <StatPill label="Cargo" value={ship.stats.cargoCapacity.toLocaleString()} />
-        <StatPill label="Attack" value={ship.stats.attackPower} />
-        <StatPill label="Defense" value={ship.stats.defenseRating} />
-      </div>
-
-      {/* Cost */}
-      <div className="flex gap-2 mb-3">
-        <CostBadge color="bg-orange-400" label="Metal" cost={ship.cost.metal} have={metal} />
-        {ship.cost.gas > 0 && (
-          <CostBadge color="bg-violet-400" label="Gas" cost={ship.cost.gas} have={gas} />
-        )}
-      </div>
-
-      <div className="text-[10px] text-slate-500 mb-3">
-        Build time: {formatTime(buildTime * 1000)}
-      </div>
-
-      <button
-        onClick={handleBuild}
-        disabled={!canBuild}
-        className="w-full py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition-colors"
-      >
-        {queueFull ? 'Queue Full' : !canAfford ? 'Insufficient Resources' : 'Build →'}
-      </button>
     </div>
   )
 }
 
-function StatPill({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="flex items-center justify-between px-2 py-1 bg-slate-900/50 rounded text-[10px]">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-slate-300 font-medium">{value}</span>
-    </div>
-  )
-}
-
-function CostBadge({ color, label, cost, have }: { color: string; label: string; cost: number; have: number }) {
-  const canAfford = have >= cost
-  return (
-    <div className={`flex items-center gap-1.5 px-2 py-1 rounded bg-slate-900/50 text-[10px] flex-1`}>
-      <div className={`w-1.5 h-1.5 rounded-sm ${color}`} />
-      <span className={canAfford ? 'text-slate-300' : 'text-red-400'}>{cost.toLocaleString()}</span>
-    </div>
-  )
-}
