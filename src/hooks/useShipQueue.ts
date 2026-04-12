@@ -9,7 +9,7 @@ export { formatTime }
 export function useShipQueue(
   planetId: string | undefined,
   queue: ShipQueueItem[],
-  onBuildComplete: () => void
+  onBuildComplete: () => Promise<void>
 ) {
   const [shipTimeRemaining, setShipTimeRemaining] = useState<number | null>(null)
   const [activeShipBuild, setActiveShipBuild] = useState<ShipQueueItem | null>(null)
@@ -34,7 +34,7 @@ export function useShipQueue(
       await supabase.functions.invoke('game-action', {
         body: { action: 'complete_ship_build', planetId },
       })
-      onBuildComplete()
+      await onBuildComplete()
     } catch (err) {
       console.error('Failed to complete ship build:', err)
     } finally {
@@ -69,7 +69,7 @@ export function useShipQueue(
       if (error) throw error
       if (data?.error) throw new Error(data.error)
 
-      onBuildComplete()
+      await onBuildComplete()
       return data
     },
     [planetId, onBuildComplete]

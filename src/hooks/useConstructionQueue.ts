@@ -6,7 +6,7 @@ import type { ConstructionItem } from './usePlanet'
 export function useConstructionQueue(
   planetId: string | undefined,
   queue: ConstructionItem[],
-  onBuildComplete: () => void
+  onBuildComplete: () => Promise<void>
 ) {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
   const [activeBuild, setActiveBuild] = useState<ConstructionItem | null>(null)
@@ -31,7 +31,7 @@ export function useConstructionQueue(
       await supabase.functions.invoke('game-action', {
         body: { action: 'complete_build', planetId },
       })
-      onBuildComplete()
+      await onBuildComplete()
     } catch (err) {
       console.error('Failed to complete build:', err)
     } finally {
@@ -66,7 +66,7 @@ export function useConstructionQueue(
       if (error) throw error
       if (data?.error) throw new Error(data.error)
 
-      onBuildComplete()
+      await onBuildComplete()
       return data
     },
     [planetId, onBuildComplete]
