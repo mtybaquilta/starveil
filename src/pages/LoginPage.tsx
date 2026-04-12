@@ -32,7 +32,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[url('/src/assets/small_fighter.png')] bg-cover flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[url('/src/assets/probe.png')] bg-cover flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <h1 className="text-3xl font-bold text-slate-100 bg-slate-750 text-center mb-2">Starveil: Interstellar Siege</h1>
         <p className="text-slate-500 text-center text-sm mb-8">Space Empire Simulation</p>
