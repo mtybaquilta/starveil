@@ -8,12 +8,15 @@ export enum ForecastDetail {
 }
 
 const WEATHER_NAMES: Record<string, string> = {
-  calm_skies: 'Calm Skies',
-  solar_storm: 'Solar Storm',
-  metal_vein: 'Metal Vein Discovered',
-  gas_leak: 'Gas Leak',
-  ion_storm: 'Ion Storm',
-  asteroid_field: 'Asteroid Field',
+  calm_skies:      'Calm Skies',
+  solar_flare:     'Solar Flare',
+  metal_vein:      'Metal Vein Discovered',
+  gas_pocket:      'Gas Pocket',
+  ion_storm:       'Ion Storm',
+  dust_storm:      'Dust Storm',
+  solar_storm:     'Solar Storm',
+  asteroid_shower: 'Asteroid Shower',
+  nebula_drift:    'Nebula Drift',
 }
 
 type WeatherData = {

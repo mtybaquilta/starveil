@@ -6,11 +6,12 @@ import { formatTime } from '../hooks/useConstructionQueue'
 import type { GameContext } from '../components/Layout'
 
 export function ShipyardPage() {
-  const { buildings, resources, activeShipBuild, startShipBuild, shipFleet } = useOutletContext<GameContext>()
+  const { buildings, resources, activeShipBuild, startShipBuild, shipFleet, technologies } = useOutletContext<GameContext>()
 
   const buildingLevels = new Map(buildings.map((b) => [b.building_id, b.level]))
   const shipyardLevel = buildingLevels.get('shipyard') ?? 0
 
+  const techLevels = new Map(technologies.map((t) => [t.tech_id, t.level]))
   const fleetCounts = new Map(shipFleet.map((s) => [s.ship_type, s.count]))
 
   if (shipyardLevel === 0) {
@@ -44,7 +45,16 @@ export function ShipyardPage() {
 
       <div className="grid grid-cols-3 gap-4">
         {SHIPS.map((ship) => {
-          const isLocked = ship.requiredShipyardLevel > shipyardLevel
+          const shipyardLocked = ship.requiredShipyardLevel > shipyardLevel
+          const techLocked = ship.requiredTech
+            ? (techLevels.get(ship.requiredTech.techId) ?? 0) < ship.requiredTech.level
+            : false
+          const isLocked = shipyardLocked || techLocked
+          const lockReason = shipyardLocked
+            ? `Shipyard Lv.${ship.requiredShipyardLevel}`
+            : techLocked && ship.requiredTech
+              ? `${ship.requiredTech.techId.replace(/_/g, ' ')} Lv.${ship.requiredTech.level}`
+              : undefined
           const canAfford = resources.metal >= ship.cost.metal && resources.gas >= ship.cost.gas
           const queueFull = activeShipBuild !== null
           const canBuild = !isLocked && !queueFull && canAfford
@@ -56,6 +66,7 @@ export function ShipyardPage() {
               key={ship.id}
               ship={ship}
               isLocked={isLocked}
+              lockReason={lockReason}
               canBuild={canBuild}
               queueFull={queueFull}
               canAfford={canAfford}
@@ -75,6 +86,7 @@ export function ShipyardPage() {
 function ShipCard({
   ship,
   isLocked,
+  lockReason,
   canBuild,
   queueFull,
   canAfford,
@@ -86,6 +98,7 @@ function ShipCard({
 }: {
   ship: ReturnType<typeof getShipConfig>
   isLocked: boolean
+  lockReason?: string
   canBuild: boolean
   queueFull: boolean
   canAfford: boolean
@@ -107,10 +120,8 @@ function ShipCard({
     return (
       <div className="p-4 bg-slate-800/20 rounded-xl border border-dashed border-slate-700/30">
         <span className="text-4xl opacity-30">{ship.icon}</span>
-        <div className="text-xs font-semibold text-slate-600 mb-1">{ship.name}</div>
-        <div className="text-[10px] text-slate-700">
-          Requires Shipyard Lv.{ship.requiredShipyardLevel}
-        </div>
+        <div className="text-xs font-semibold text-slate-600 mb-1 mt-1">{ship.name}</div>
+        <div className="text-[10px] text-slate-700">Requires {lockReason}</div>
       </div>
     )
   }
