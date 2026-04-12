@@ -8,7 +8,11 @@ import { useShipQueue } from '../hooks/useShipQueue'
 import { useMissions } from '../hooks/useMissions'
 
 export function Layout() {
-  const { planet, buildings, constructionQueue, shipFleet, shipQueue, missions, knownLocations, nearbySectors, weather, events, loading, refetch } = usePlanet()
+  const {
+    planet, buildings, constructionQueue, shipFleet, shipQueue,
+    missions, galaxyMap, technologies, researchQueue,
+    weather, events, loading, refetch,
+  } = usePlanet()
   const resources = useResources(planet, buildings, weather)
   const { activeBuild, timeRemaining, startBuild } = useConstructionQueue(
     planet?.id,
@@ -20,7 +24,7 @@ export function Layout() {
     shipQueue,
     refetch
   )
-  const { activeMissions, dispatchMission, generateSectors } = useMissions(
+  const { activeMissions, dispatchMission } = useMissions(
     planet?.id,
     missions,
     refetch
@@ -80,9 +84,9 @@ export function Layout() {
               missions,
               activeMissions,
               dispatchMission,
-              generateSectors,
-              knownLocations,
-              nearbySectors,
+              galaxyMap,
+              technologies,
+              researchQueue,
               refetch,
             }}
           />
@@ -107,8 +111,8 @@ export type GameContext = {
   missions: ReturnType<typeof usePlanet>['missions']
   activeMissions: ReturnType<typeof useMissions>['activeMissions']
   dispatchMission: ReturnType<typeof useMissions>['dispatchMission']
-  generateSectors: ReturnType<typeof useMissions>['generateSectors']
-  knownLocations: ReturnType<typeof usePlanet>['knownLocations']
-  nearbySectors: ReturnType<typeof usePlanet>['nearbySectors']
+  galaxyMap: ReturnType<typeof usePlanet>['galaxyMap']
+  technologies: ReturnType<typeof usePlanet>['technologies']
+  researchQueue: ReturnType<typeof usePlanet>['researchQueue']
   refetch: () => Promise<void>
 }

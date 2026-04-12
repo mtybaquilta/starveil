@@ -44,27 +44,32 @@ export type MissionResult = {
   rewards?: { metal?: number; gas?: number }
   combat_log?: unknown[]
   ships_lost?: Record<string, number>
-  discovered?: { coordinates: string; name: string; type: string }
-  encounter_type?: string
 }
 
-export type KnownLocation = {
+export type GalaxyMapEntry = {
   id: string
   coordinates: string
-  name: string
-  location_type: string
+  visibility: 'detected' | 'revealed'
+  location_type: string | null
+  name: string | null
   metadata: Record<string, unknown>
+  detected_at: string
+  revealed_at: string | null
+  cleared_at: string | null
+  respawns_at: string | null
 }
 
-export type NearbySector = {
+export type PlayerTechnology = {
+  tech_id: string
+  level: number
+}
+
+export type ResearchQueueItem = {
   id: string
-  coordinates: string
-  name: string
-  sector_type: string
-  distance: number
-  richness: number
-  danger_level: number
-  expires_at: string
+  tech_id: string
+  target_level: number
+  started_at: string
+  completes_at: string
 }
 
 export type PlanetWeather = {
@@ -102,8 +107,9 @@ export function usePlanet() {
   const [shipFleet, setShipFleet] = useState<PlanetShip[]>([])
   const [shipQueue, setShipQueue] = useState<ShipQueueItem[]>([])
   const [missions, setMissions] = useState<Mission[]>([])
-  const [knownLocations, setKnownLocations] = useState<KnownLocation[]>([])
-  const [nearbySectors, setNearbySectors] = useState<NearbySector[]>([])
+  const [galaxyMap, setGalaxyMap] = useState<GalaxyMapEntry[]>([])
+  const [technologies, setTechnologies] = useState<PlayerTechnology[]>([])
+  const [researchQueue, setResearchQueue] = useState<ResearchQueueItem[]>([])
   const [weather, setWeather] = useState<PlanetWeather | null>(null)
   const [events, setEvents] = useState<PlanetEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -111,6 +117,9 @@ export function usePlanet() {
 
   const fetchAll = useCallback(async () => {
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const playerId = sessionData.session?.user.id
+
       const { data: planets, error: planetErr } = await supabase
         .from('planets')
         .select('*')
@@ -122,7 +131,11 @@ export function usePlanet() {
 
       const planetId = planets.id
 
-      const [buildingsRes, queueRes, weatherRes, eventsRes, shipsRes, shipQueueRes, missionsRes, knownLocsRes, sectorsRes] = await Promise.all([
+      const [
+        buildingsRes, queueRes, weatherRes, eventsRes,
+        shipsRes, shipQueueRes, missionsRes,
+        galaxyRes, techRes, researchRes,
+      ] = await Promise.all([
         supabase
           .from('planet_buildings')
           .select('building_id, level')
@@ -159,14 +172,17 @@ export function usePlanet() {
           .neq('status', 'completed')
           .order('dispatched_at', { ascending: false }),
         supabase
-          .from('known_locations')
+          .from('galaxy_map')
           .select('*')
-          .eq('planet_id', planetId),
+          .eq('player_id', playerId),
         supabase
-          .from('nearby_sectors')
+          .from('player_technologies')
+          .select('tech_id, level')
+          .eq('player_id', playerId),
+        supabase
+          .from('research_queue')
           .select('*')
-          .eq('planet_id', planetId)
-          .gte('expires_at', new Date().toISOString()),
+          .eq('player_id', playerId),
       ])
 
       if (buildingsRes.data) setBuildings(buildingsRes.data)
@@ -176,8 +192,9 @@ export function usePlanet() {
       if (shipsRes.data) setShipFleet(shipsRes.data)
       if (shipQueueRes.data) setShipQueue(shipQueueRes.data)
       if (missionsRes.data) setMissions(missionsRes.data)
-      if (knownLocsRes.data) setKnownLocations(knownLocsRes.data)
-      if (sectorsRes.data) setNearbySectors(sectorsRes.data)
+      if (galaxyRes.data) setGalaxyMap(galaxyRes.data)
+      if (techRes.data) setTechnologies(techRes.data)
+      if (researchRes.data) setResearchQueue(researchRes.data)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -196,8 +213,9 @@ export function usePlanet() {
     shipFleet,
     shipQueue,
     missions,
-    knownLocations,
-    nearbySectors,
+    galaxyMap,
+    technologies,
+    researchQueue,
     weather,
     events,
     loading,
