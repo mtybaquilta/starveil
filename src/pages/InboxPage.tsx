@@ -99,10 +99,10 @@ function MissionReport({ mission }: { mission: Mission }) {
 }
 
 export function InboxPage() {
-  const { missions } = useOutletContext<GameContext>()
+  const { completedMissions: rawCompleted } = useOutletContext<GameContext>()
 
-  const completedMissions = missions
-    .filter((m) => m.status === 'completed' && m.result)
+  const completedMissions = rawCompleted
+    .filter((m) => m.result)
     .sort((a, b) => new Date(b.returns_at).getTime() - new Date(a.returns_at).getTime())
 
   return (

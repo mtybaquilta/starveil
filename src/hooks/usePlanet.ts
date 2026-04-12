@@ -108,6 +108,7 @@ export function usePlanet() {
   const [shipFleet, setShipFleet] = useState<PlanetShip[]>([])
   const [shipQueue, setShipQueue] = useState<ShipQueueItem[]>([])
   const [missions, setMissions] = useState<Mission[]>([])
+  const [completedMissions, setCompletedMissions] = useState<Mission[]>([])
   const [galaxyMap, setGalaxyMap] = useState<GalaxyMapEntry[]>([])
   const [technologies, setTechnologies] = useState<PlayerTechnology[]>([])
   const [researchQueue, setResearchQueue] = useState<ResearchQueueItem[]>([])
@@ -134,7 +135,7 @@ export function usePlanet() {
 
       const [
         buildingsRes, queueRes, weatherRes, eventsRes,
-        shipsRes, shipQueueRes, missionsRes,
+        shipsRes, shipQueueRes, missionsRes, completedMissionsRes,
         galaxyRes, techRes, researchRes,
       ] = await Promise.all([
         supabase
@@ -173,6 +174,13 @@ export function usePlanet() {
           .neq('status', 'completed')
           .order('dispatched_at', { ascending: false }),
         supabase
+          .from('missions')
+          .select('*')
+          .eq('planet_id', planetId)
+          .eq('status', 'completed')
+          .order('returns_at', { ascending: false })
+          .limit(20),
+        supabase
           .from('galaxy_map')
           .select('*')
           .eq('player_id', playerId),
@@ -193,6 +201,7 @@ export function usePlanet() {
       if (shipsRes.data) setShipFleet(shipsRes.data)
       if (shipQueueRes.data) setShipQueue(shipQueueRes.data)
       if (missionsRes.data) setMissions(missionsRes.data)
+      if (completedMissionsRes.data) setCompletedMissions(completedMissionsRes.data)
       if (galaxyRes.data) setGalaxyMap(galaxyRes.data)
       if (techRes.data) setTechnologies(techRes.data)
       if (researchRes.data) setResearchQueue(researchRes.data)
@@ -214,6 +223,7 @@ export function usePlanet() {
     shipFleet,
     shipQueue,
     missions,
+    completedMissions,
     galaxyMap,
     technologies,
     researchQueue,

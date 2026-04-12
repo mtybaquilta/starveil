@@ -10,7 +10,7 @@ import { useMissions } from '../hooks/useMissions'
 export function Layout() {
   const {
     planet, buildings, constructionQueue, shipFleet, shipQueue,
-    missions, galaxyMap, technologies, researchQueue,
+    missions, completedMissions, galaxyMap, technologies, researchQueue,
     weather, events, loading, refetch,
   } = usePlanet()
   const resources = useResources(planet, buildings, weather)
@@ -82,6 +82,7 @@ export function Layout() {
               startShipBuild,
               shipFleet,
               missions,
+              completedMissions,
               activeMissions,
               dispatchMission,
               galaxyMap,
@@ -109,6 +110,7 @@ export type GameContext = {
   startShipBuild: ReturnType<typeof useShipQueue>['startShipBuild']
   shipFleet: ReturnType<typeof usePlanet>['shipFleet']
   missions: ReturnType<typeof usePlanet>['missions']
+  completedMissions: ReturnType<typeof usePlanet>['completedMissions']
   activeMissions: ReturnType<typeof useMissions>['activeMissions']
   dispatchMission: ReturnType<typeof useMissions>['dispatchMission']
   galaxyMap: ReturnType<typeof usePlanet>['galaxyMap']
