@@ -1,56 +1,46 @@
-export type MissionType = 'mining' | 'scout_patrol' | 'expedition' | 'raid'
+export type MissionType = 'mining' | 'raid' | 'salvage'
 
 export type MissionConfig = {
   type: MissionType
   name: string
   description: string
   icon: string
+  /** Ship types that must be present in the fleet for this mission. */
   requiredShips: string[]
   minDurationSeconds: number
-  discoversLocations: boolean
 }
 
-export const MISSION_CONFIGS: Record<MissionType, MissionConfig> = {
-  mining: {
+export const MISSION_TYPES: MissionConfig[] = [
+  {
     type: 'mining',
     name: 'Mining Run',
-    description: 'Send miners to extract resources from an asteroid field.',
+    description: 'Deploy harvesters to a known asteroid field or resource site. Cargo ships carry the yield home — without them, harvesters extract but cannot return resources.',
     icon: '⛏️',
-    requiredShips: ['transport', 'explorer'],
+    requiredShips: ['harvester'],
     minDurationSeconds: 120,
-    discoversLocations: false,
   },
-  scout_patrol: {
-    type: 'scout_patrol',
-    name: 'Scout Patrol',
-    description: 'Send scouts to search for bandit camps.',
-    icon: '🛸',
-    requiredShips: ['scout'],
-    minDurationSeconds: 60,
-    discoversLocations: true,
-  },
-  expedition: {
-    type: 'expedition',
-    name: 'Expedition',
-    description: 'Send explorers on a deep space expedition. May find resources, enemies, or asteroids.',
-    icon: '🌌',
-    requiredShips: ['explorer'],
-    minDurationSeconds: 180,
-    discoversLocations: true,
-  },
-  raid: {
+  {
     type: 'raid',
     name: 'Raid',
-    description: 'Attack a known bandit camp for resources. Bring enough firepower!',
+    description: 'Attack a revealed enemy location. Bring enough firepower to destroy the defenders and loot their resources.',
     icon: '⚔️',
-    requiredShips: ['small_fighter', 'large_fighter'],
+    requiredShips: ['small_fighter'],
     minDurationSeconds: 90,
-    discoversLocations: false,
   },
-}
+  {
+    type: 'salvage',
+    name: 'Salvage',
+    description: 'Send cargo ships to an abandoned or cleared location to recover drifting resources and wreckage.',
+    icon: '🛸',
+    requiredShips: ['small_cargo'],
+    minDurationSeconds: 60,
+  },
+]
+
+const MISSION_MAP = new Map(MISSION_TYPES.map((m) => [m.type, m]))
 
 export function getMissionConfig(type: string): MissionConfig {
-  const config = MISSION_CONFIGS[type as MissionType]
+  const config = MISSION_MAP.get(type as MissionType)
   if (!config) throw new Error(`Unknown mission type: ${type}`)
   return config
 }

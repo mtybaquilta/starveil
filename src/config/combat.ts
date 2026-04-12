@@ -47,11 +47,3 @@ export const BANDIT_FLEETS: Record<string, EnemyFleet> = {
   },
 }
 
-export type ExpeditionEncounter = 'mining_site' | 'bandits' | 'asteroid' | 'nothing'
-
-export const EXPEDITION_WEIGHTS: Record<ExpeditionEncounter, number> = {
-  mining_site: 30,
-  bandits: 25,
-  asteroid: 20,
-  nothing: 25,
-}
