@@ -119,7 +119,7 @@ function ShipCard({
   if (isLocked) {
     return (
       <div className="p-4 bg-slate-800/20 rounded-xl border border-dashed border-slate-700/30">
-        <span className="text-4xl opacity-30">{ship.icon}</span>
+        <section className={`p-12 bg-[url('${ship.image}')] bg-contain bg-no-repeat`}></section>
         <div className="text-xs font-semibold text-slate-600 mb-1 mt-1">{ship.name}</div>
         <div className="text-[10px] text-slate-700">Requires {lockReason}</div>
       </div>
@@ -129,17 +129,18 @@ function ShipCard({
   return (
     <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/10">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-4xl">{ship.icon}</span>
         <div>
           <div className="text-xs font-semibold text-slate-200">{ship.name}</div>
           <div className="text-[10px] text-slate-500">Fleet: {fleetCount}</div>
         </div>
       </div>
 
-      <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">{ship.description}</p>
+      <section className={`p-12 bg-[url('${ship.image}')] bg-contain bg-no-repeat`}></section>
+
+      <p className="text-[10px] text-slate-500 mb-4 mt-2 leading-relaxed">{ship.description}</p>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-1 mb-3">
+      <div className="grid grid-cols-2 gap-0 mb-1">
         <StatPill label="Speed" value={ship.stats.speed} />
         <StatPill label="Cargo" value={ship.stats.cargoCapacity.toLocaleString()} />
         <StatPill label="Attack" value={ship.stats.attackPower} />

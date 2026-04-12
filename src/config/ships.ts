@@ -18,6 +18,7 @@ export type ShipConfig = {
   stats: { speed: number; cargoCapacity: number; attackPower: number; defenseRating: number; miningYield: number }
   requiredShipyardLevel: number
   requiredTech?: { techId: string; level: number }
+  image: string,
   icon: string
 }
 
@@ -30,6 +31,7 @@ export const SHIPS: ShipConfig[] = [
     baseBuildTimeSeconds: 20,
     stats: { speed: 15, cargoCapacity: 0, attackPower: 0, defenseRating: 1, miningYield: 0 },
     requiredShipyardLevel: 1,
+    image: '/src/assets/probe.png',
     icon: '🔭',
   },
   {
@@ -40,6 +42,7 @@ export const SHIPS: ShipConfig[] = [
     baseBuildTimeSeconds: 360,
     stats: { speed: 14, cargoCapacity: 50, attackPower: 18, defenseRating: 10, miningYield: 0 },
     requiredShipyardLevel: 2,
+    image: '/src/assets/small_fighter.png',
     icon: '⚔️',
   },
   {
@@ -50,6 +53,7 @@ export const SHIPS: ShipConfig[] = [
     baseBuildTimeSeconds: 900,
     stats: { speed: 8, cargoCapacity: 200, attackPower: 55, defenseRating: 40, miningYield: 0 },
     requiredShipyardLevel: 4,
+    image: '/src/assets/large_fighter.png',
     icon: '🛡️',
   },
   {
@@ -61,6 +65,7 @@ export const SHIPS: ShipConfig[] = [
     stats: { speed: 7, cargoCapacity: 400, attackPower: 80, defenseRating: 70, miningYield: 0 },
     requiredShipyardLevel: 6,
     requiredTech: { techId: 'capital_ship_engineering', level: 1 },
+    image: '/src/assets/cruiser.png',
     icon: '🚀',
   },
   {
@@ -72,6 +77,7 @@ export const SHIPS: ShipConfig[] = [
     stats: { speed: 5, cargoCapacity: 300, attackPower: 150, defenseRating: 100, miningYield: 0 },
     requiredShipyardLevel: 8,
     requiredTech: { techId: 'capital_ship_engineering', level: 3 },
+    image: '/src/assets/gunship.png',
     icon: '💥',
   },
   {
@@ -83,6 +89,7 @@ export const SHIPS: ShipConfig[] = [
     stats: { speed: 4, cargoCapacity: 500, attackPower: 300, defenseRating: 200, miningYield: 0 },
     requiredShipyardLevel: 10,
     requiredTech: { techId: 'capital_ship_engineering', level: 5 },
+    image: '/src/assets/destroyer.png',
     icon: '☠️',
   },
   {
@@ -93,6 +100,7 @@ export const SHIPS: ShipConfig[] = [
     baseBuildTimeSeconds: 600,
     stats: { speed: 6, cargoCapacity: 0, attackPower: 2, defenseRating: 10, miningYield: 15 },
     requiredShipyardLevel: 3,
+    image: '/src/assets/harvester.png',
     icon: '⛏️',
   },
   {
@@ -103,6 +111,7 @@ export const SHIPS: ShipConfig[] = [
     baseBuildTimeSeconds: 300,
     stats: { speed: 8, cargoCapacity: 2000, attackPower: 1, defenseRating: 8, miningYield: 0 },
     requiredShipyardLevel: 2,
+    image: '/src/assets/small_cargo.png',
     icon: '📦',
   },
   {
@@ -113,6 +122,7 @@ export const SHIPS: ShipConfig[] = [
     baseBuildTimeSeconds: 900,
     stats: { speed: 5, cargoCapacity: 10000, attackPower: 2, defenseRating: 15, miningYield: 0 },
     requiredShipyardLevel: 5,
+    image: '/src/assets/large_cargo.png',
     icon: '🚢',
   },
 ]
