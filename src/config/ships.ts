@@ -1,4 +1,13 @@
-export type ShipId = 'probe' | 'scout' | 'explorer' | 'small_fighter' | 'large_fighter' | 'transport'
+export type ShipId =
+  | 'probe'
+  | 'small_fighter'
+  | 'large_fighter'
+  | 'cruiser'
+  | 'gunship'
+  | 'destroyer'
+  | 'harvester'
+  | 'small_cargo'
+  | 'large_cargo'
 
 export type ShipConfig = {
   id: ShipId
@@ -8,6 +17,7 @@ export type ShipConfig = {
   baseBuildTimeSeconds: number
   stats: { speed: number; cargoCapacity: number; attackPower: number; defenseRating: number; miningYield: number }
   requiredShipyardLevel: number
+  requiredTech?: { techId: string; level: number }
   icon: string
 }
 
@@ -15,32 +25,12 @@ export const SHIPS: ShipConfig[] = [
   {
     id: 'probe',
     name: 'Probe',
-    description: 'A cheap, disposable scout drone for basic reconnaissance.',
-    cost: { metal: 100, gas: 0 },
-    baseBuildTimeSeconds: 30,
-    stats: { speed: 8, cargoCapacity: 0, attackPower: 0, defenseRating: 1, miningYield: 0 },
+    description: 'A disposable scanning drone. Sent to detected coordinates to reveal what is there. Consumed on use.',
+    cost: { metal: 50, gas: 0 },
+    baseBuildTimeSeconds: 20,
+    stats: { speed: 15, cargoCapacity: 0, attackPower: 0, defenseRating: 1, miningYield: 0 },
     requiredShipyardLevel: 1,
     icon: '🔭',
-  },
-  {
-    id: 'scout',
-    name: 'Scout',
-    description: 'A fast, light reconnaissance vessel.',
-    cost: { metal: 300, gas: 100 },
-    baseBuildTimeSeconds: 90,
-    stats: { speed: 12, cargoCapacity: 100, attackPower: 2, defenseRating: 3, miningYield: 0 },
-    requiredShipyardLevel: 2,
-    icon: '🛸',
-  },
-  {
-    id: 'explorer',
-    name: 'Explorer',
-    description: 'A medium-range vessel for extended deep space missions.',
-    cost: { metal: 800, gas: 400 },
-    baseBuildTimeSeconds: 240,
-    stats: { speed: 9, cargoCapacity: 500, attackPower: 5, defenseRating: 8, miningYield: 5 },
-    requiredShipyardLevel: 4,
-    icon: '🌌',
   },
   {
     id: 'small_fighter',
@@ -49,7 +39,7 @@ export const SHIPS: ShipConfig[] = [
     cost: { metal: 1200, gas: 600 },
     baseBuildTimeSeconds: 360,
     stats: { speed: 14, cargoCapacity: 50, attackPower: 18, defenseRating: 10, miningYield: 0 },
-    requiredShipyardLevel: 5,
+    requiredShipyardLevel: 2,
     icon: '⚔️',
   },
   {
@@ -59,18 +49,71 @@ export const SHIPS: ShipConfig[] = [
     cost: { metal: 3500, gas: 2000 },
     baseBuildTimeSeconds: 900,
     stats: { speed: 8, cargoCapacity: 200, attackPower: 55, defenseRating: 40, miningYield: 0 },
-    requiredShipyardLevel: 8,
+    requiredShipyardLevel: 4,
     icon: '🛡️',
   },
   {
-    id: 'transport',
-    name: 'Transport',
-    description: 'A massive cargo hauler. Slow but carries enormous loads.',
-    cost: { metal: 2000, gas: 1000 },
+    id: 'cruiser',
+    name: 'Cruiser',
+    description: 'A mid-tier capital ship. Good balance of firepower and durability.',
+    cost: { metal: 8000, gas: 5000 },
+    baseBuildTimeSeconds: 1800,
+    stats: { speed: 7, cargoCapacity: 400, attackPower: 80, defenseRating: 70, miningYield: 0 },
+    requiredShipyardLevel: 6,
+    requiredTech: { techId: 'capital_ship_engineering', level: 1 },
+    icon: '🚀',
+  },
+  {
+    id: 'gunship',
+    name: 'Gunship',
+    description: 'A heavy firepower platform. Devastating in battle but slow.',
+    cost: { metal: 15000, gas: 10000 },
+    baseBuildTimeSeconds: 3600,
+    stats: { speed: 5, cargoCapacity: 300, attackPower: 150, defenseRating: 100, miningYield: 0 },
+    requiredShipyardLevel: 8,
+    requiredTech: { techId: 'capital_ship_engineering', level: 3 },
+    icon: '💥',
+  },
+  {
+    id: 'destroyer',
+    name: 'Destroyer',
+    description: 'The pinnacle of military engineering. Extremely powerful and costly.',
+    cost: { metal: 30000, gas: 20000 },
+    baseBuildTimeSeconds: 7200,
+    stats: { speed: 4, cargoCapacity: 500, attackPower: 300, defenseRating: 200, miningYield: 0 },
+    requiredShipyardLevel: 10,
+    requiredTech: { techId: 'capital_ship_engineering', level: 5 },
+    icon: '☠️',
+  },
+  {
+    id: 'harvester',
+    name: 'Harvester',
+    description: 'A resource extraction vessel. Mines at a location but has no cargo hold — needs Cargo ships to carry resources home.',
+    cost: { metal: 2000, gas: 800 },
     baseBuildTimeSeconds: 600,
-    stats: { speed: 5, cargoCapacity: 5000, attackPower: 2, defenseRating: 15, miningYield: 10 },
+    stats: { speed: 6, cargoCapacity: 0, attackPower: 2, defenseRating: 10, miningYield: 15 },
     requiredShipyardLevel: 3,
+    icon: '⛏️',
+  },
+  {
+    id: 'small_cargo',
+    name: 'Small Cargo',
+    description: 'A light transport. Cheap and essential for early game resource hauling.',
+    cost: { metal: 800, gas: 400 },
+    baseBuildTimeSeconds: 300,
+    stats: { speed: 8, cargoCapacity: 2000, attackPower: 1, defenseRating: 8, miningYield: 0 },
+    requiredShipyardLevel: 2,
     icon: '📦',
+  },
+  {
+    id: 'large_cargo',
+    name: 'Large Cargo',
+    description: 'A massive cargo hauler. Slow but carries enormous loads for late game operations.',
+    cost: { metal: 4000, gas: 2000 },
+    baseBuildTimeSeconds: 900,
+    stats: { speed: 5, cargoCapacity: 10000, attackPower: 2, defenseRating: 15, miningYield: 0 },
+    requiredShipyardLevel: 5,
+    icon: '🚢',
   },
 ]
 

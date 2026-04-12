@@ -17,12 +17,13 @@ const NAV_ITEMS = [
   { to: '/resources', label: 'Resources' },
   { to: '/shipyard', label: 'Shipyard' },
   { to: '/fleet', label: 'Fleet' },
+  { to: '/galaxy', label: 'Galaxy Map' },
   { to: '/missions', label: 'Missions' },
+  { to: '/research', label: 'Research' },
+  { to: '/inbox', label: 'Inbox' },
 ]
 
-const LOCKED_ITEMS = [
-  { label: 'Galaxy Map', hint: 'Coming in v4' },
-]
+const LOCKED_ITEMS: { label: string; hint: string }[] = []
 
 export function Sidebar({ activeBuild, timeRemaining, activeShipBuild, shipTimeRemaining, activeMissionCount }: Props) {
   const { signOut } = useAuth()

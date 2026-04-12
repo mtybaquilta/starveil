@@ -29,7 +29,17 @@ export function WeatherDisplay({ weather, buildings }: Props) {
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/30 rounded-lg">
       <span className="text-sm">
-        {weather.weather_type === 'calm_skies' ? '☀️' : '🌩️'}
+        {({
+          calm_skies:      '☀️',
+          solar_flare:     '🔆',
+          metal_vein:      '⛏️',
+          gas_pocket:      '💨',
+          ion_storm:       '⚡',
+          dust_storm:      '🌪️',
+          solar_storm:     '☄️',
+          asteroid_shower: '🪨',
+          nebula_drift:    '🌌',
+        } as Record<string, string>)[weather.weather_type] ?? '🌩️'}
       </span>
       <div>
         <div className="text-xs font-medium text-slate-200">

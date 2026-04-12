@@ -8,6 +8,9 @@ import { ResourcesPage } from './pages/ResourcesPage'
 import { ShipyardPage } from './pages/ShipyardPage'
 import { FleetPage } from './pages/FleetPage'
 import { MissionsPage } from './pages/MissionsPage'
+import { GalaxyMapPage } from './pages/GalaxyMapPage'
+import { ResearchPage } from './pages/ResearchPage'
+import { InboxPage } from './pages/InboxPage'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -42,7 +45,10 @@ function App() {
           <Route path="resources" element={<ResourcesPage />} />
           <Route path="shipyard" element={<ShipyardPage />} />
           <Route path="fleet" element={<FleetPage />} />
+          <Route path="galaxy" element={<GalaxyMapPage />} />
           <Route path="missions" element={<MissionsPage />} />
+          <Route path="research" element={<ResearchPage />} />
+          <Route path="inbox" element={<InboxPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

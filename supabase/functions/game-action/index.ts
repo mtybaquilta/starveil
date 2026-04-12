@@ -19,7 +19,6 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Use service role key to validate the user JWT
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -33,36 +32,37 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Use admin client for all DB operations — ownership enforced via userId checks in handlers
     const supabase = adminClient
-
     const body = await req.json()
     const { action, planetId, buildingId, shipType, quantity, devMode } = body
 
     if (action === 'start_build') {
       return await handleStartBuild(supabase, user.id, planetId, buildingId, !!devMode, corsHeaders)
     }
-
     if (action === 'complete_build') {
       return await handleCompleteBuild(supabase, user.id, planetId, corsHeaders)
     }
-
     if (action === 'start_ship_build') {
       return await handleStartShipBuild(supabase, user.id, planetId, shipType, quantity ?? 1, !!devMode, corsHeaders)
     }
-
     if (action === 'complete_ship_build') {
       return await handleCompleteShipBuild(supabase, user.id, planetId, corsHeaders)
     }
-
-    if (action === 'generate_sectors') {
-      return await handleGenerateSectors(supabase, user.id, planetId, corsHeaders)
+    if (action === 'run_radar') {
+      return await handleRunRadar(supabase, user.id, planetId, corsHeaders)
     }
-
+    if (action === 'send_probe') {
+      return await handleSendProbe(supabase, user.id, planetId, body.targetCoords, corsHeaders)
+    }
+    if (action === 'start_research') {
+      return await handleStartResearch(supabase, user.id, planetId, body.techId, !!devMode, corsHeaders)
+    }
+    if (action === 'complete_research') {
+      return await handleCompleteResearch(supabase, user.id, corsHeaders)
+    }
     if (action === 'dispatch_mission') {
       return await handleDispatchMission(supabase, user.id, planetId, body.missionType, body.fleet, body.targetCoords, !!devMode, corsHeaders)
     }
-
     if (action === 'resolve_mission') {
       return await handleResolveMission(supabase, user.id, planetId, body.missionId, corsHeaders)
     }
@@ -79,7 +79,9 @@ Deno.serve(async (req: Request) => {
   }
 })
 
-// --- Formula functions (mirrors src/config/formulas.ts) ---
+// ============================================================
+// Formula helpers (mirror src/config/formulas.ts)
+// ============================================================
 
 const BASE_METAL_PRODUCTION = 10
 const BASE_GAS_PRODUCTION = 5
@@ -107,7 +109,18 @@ function shipBuildTimeSeconds(baseBuildTimeSeconds: number, shipyardLevel: numbe
   return baseBuildTimeSeconds * Math.max(factor, 0.05)
 }
 
-// Building config (must mirror src/config/buildings.ts)
+function researchCost(baseMetal: number, baseGas: number, level: number): { metal: number; gas: number } {
+  return { metal: baseMetal * Math.pow(1.6, level), gas: baseGas * Math.pow(1.6, level) }
+}
+
+function researchTimeSeconds(baseTime: number, level: number): number {
+  return baseTime * Math.pow(1.5, level)
+}
+
+// ============================================================
+// Static configs (mirror src/config/*.ts)
+// ============================================================
+
 const BUILDINGS: Record<string, {
   baseCost: { metal: number; gas: number }
   baseBuildTimeSeconds: number
@@ -115,513 +128,102 @@ const BUILDINGS: Record<string, {
   baseEnergyConsumption: number
   prerequisites: { buildingId: string; level: number }[]
 }> = {
-  headquarters: { baseCost: { metal: 100, gas: 50 }, baseBuildTimeSeconds: 60, baseProductionPerHour: 0, baseEnergyConsumption: 5, prerequisites: [] },
-  metal_mine: { baseCost: { metal: 60, gas: 15 }, baseBuildTimeSeconds: 30, baseProductionPerHour: 30, baseEnergyConsumption: 10, prerequisites: [] },
-  gas_refinery: { baseCost: { metal: 80, gas: 40 }, baseBuildTimeSeconds: 45, baseProductionPerHour: 20, baseEnergyConsumption: 12, prerequisites: [{ buildingId: 'headquarters', level: 2 }] },
-  solar_array: { baseCost: { metal: 50, gas: 25 }, baseBuildTimeSeconds: 30, baseProductionPerHour: 25, baseEnergyConsumption: 0, prerequisites: [] },
-  metal_storage: { baseCost: { metal: 100, gas: 0 }, baseBuildTimeSeconds: 40, baseProductionPerHour: 0, baseEnergyConsumption: 3, prerequisites: [{ buildingId: 'metal_mine', level: 2 }] },
-  gas_storage: { baseCost: { metal: 100, gas: 50 }, baseBuildTimeSeconds: 40, baseProductionPerHour: 0, baseEnergyConsumption: 3, prerequisites: [{ buildingId: 'gas_refinery', level: 2 }] },
-  weather_station: { baseCost: { metal: 120, gas: 80 }, baseBuildTimeSeconds: 50, baseProductionPerHour: 0, baseEnergyConsumption: 8, prerequisites: [{ buildingId: 'headquarters', level: 2 }] },
-  research_lab: { baseCost: { metal: 200, gas: 100 }, baseBuildTimeSeconds: 90, baseProductionPerHour: 0, baseEnergyConsumption: 15, prerequisites: [{ buildingId: 'headquarters', level: 3 }] },
-  shipyard: { baseCost: { metal: 400, gas: 200 }, baseBuildTimeSeconds: 120, baseProductionPerHour: 0, baseEnergyConsumption: 20, prerequisites: [{ buildingId: 'headquarters', level: 2 }] },
+  headquarters:    { baseCost: { metal: 100,  gas: 50  }, baseBuildTimeSeconds: 60,  baseProductionPerHour: 0,  baseEnergyConsumption: 5,  prerequisites: [] },
+  metal_mine:      { baseCost: { metal: 60,   gas: 15  }, baseBuildTimeSeconds: 30,  baseProductionPerHour: 30, baseEnergyConsumption: 10, prerequisites: [] },
+  gas_refinery:    { baseCost: { metal: 80,   gas: 40  }, baseBuildTimeSeconds: 45,  baseProductionPerHour: 20, baseEnergyConsumption: 12, prerequisites: [{ buildingId: 'headquarters', level: 2 }] },
+  solar_array:     { baseCost: { metal: 50,   gas: 25  }, baseBuildTimeSeconds: 30,  baseProductionPerHour: 25, baseEnergyConsumption: 0,  prerequisites: [] },
+  metal_storage:   { baseCost: { metal: 100,  gas: 0   }, baseBuildTimeSeconds: 40,  baseProductionPerHour: 0,  baseEnergyConsumption: 3,  prerequisites: [{ buildingId: 'metal_mine', level: 2 }] },
+  gas_storage:     { baseCost: { metal: 100,  gas: 50  }, baseBuildTimeSeconds: 40,  baseProductionPerHour: 0,  baseEnergyConsumption: 3,  prerequisites: [{ buildingId: 'gas_refinery', level: 2 }] },
+  weather_station: { baseCost: { metal: 120,  gas: 80  }, baseBuildTimeSeconds: 50,  baseProductionPerHour: 0,  baseEnergyConsumption: 8,  prerequisites: [{ buildingId: 'headquarters', level: 2 }] },
+  research_lab:    { baseCost: { metal: 200,  gas: 100 }, baseBuildTimeSeconds: 90,  baseProductionPerHour: 0,  baseEnergyConsumption: 15, prerequisites: [{ buildingId: 'headquarters', level: 3 }] },
+  shipyard:        { baseCost: { metal: 400,  gas: 200 }, baseBuildTimeSeconds: 120, baseProductionPerHour: 0,  baseEnergyConsumption: 20, prerequisites: [{ buildingId: 'headquarters', level: 2 }] },
+  radar_array:     { baseCost: { metal: 300,  gas: 200 }, baseBuildTimeSeconds: 90,  baseProductionPerHour: 0,  baseEnergyConsumption: 18, prerequisites: [{ buildingId: 'headquarters', level: 3 }] },
 }
 
-// Ship config (must mirror src/config/ships.ts)
 const SHIPS: Record<string, {
   cost: { metal: number; gas: number }
   baseBuildTimeSeconds: number
   requiredShipyardLevel: number
+  requiredTech?: { techId: string; level: number }
 }> = {
-  probe: { cost: { metal: 100, gas: 0 }, baseBuildTimeSeconds: 30, requiredShipyardLevel: 1 },
-  scout: { cost: { metal: 300, gas: 100 }, baseBuildTimeSeconds: 90, requiredShipyardLevel: 2 },
-  explorer: { cost: { metal: 800, gas: 400 }, baseBuildTimeSeconds: 240, requiredShipyardLevel: 4 },
-  small_fighter: { cost: { metal: 1200, gas: 600 }, baseBuildTimeSeconds: 360, requiredShipyardLevel: 5 },
-  large_fighter: { cost: { metal: 3500, gas: 2000 }, baseBuildTimeSeconds: 900, requiredShipyardLevel: 8 },
-  transport: { cost: { metal: 2000, gas: 1000 }, baseBuildTimeSeconds: 600, requiredShipyardLevel: 3 },
+  probe:         { cost: { metal: 50,    gas: 0     }, baseBuildTimeSeconds: 20,   requiredShipyardLevel: 1  },
+  small_fighter: { cost: { metal: 1200,  gas: 600   }, baseBuildTimeSeconds: 360,  requiredShipyardLevel: 2  },
+  large_fighter: { cost: { metal: 3500,  gas: 2000  }, baseBuildTimeSeconds: 900,  requiredShipyardLevel: 4  },
+  cruiser:       { cost: { metal: 8000,  gas: 5000  }, baseBuildTimeSeconds: 1800, requiredShipyardLevel: 6,  requiredTech: { techId: 'capital_ship_engineering', level: 1 } },
+  gunship:       { cost: { metal: 15000, gas: 10000 }, baseBuildTimeSeconds: 3600, requiredShipyardLevel: 8,  requiredTech: { techId: 'capital_ship_engineering', level: 3 } },
+  destroyer:     { cost: { metal: 30000, gas: 20000 }, baseBuildTimeSeconds: 7200, requiredShipyardLevel: 10, requiredTech: { techId: 'capital_ship_engineering', level: 5 } },
+  harvester:     { cost: { metal: 2000,  gas: 800   }, baseBuildTimeSeconds: 600,  requiredShipyardLevel: 3  },
+  small_cargo:   { cost: { metal: 800,   gas: 400   }, baseBuildTimeSeconds: 300,  requiredShipyardLevel: 2  },
+  large_cargo:   { cost: { metal: 4000,  gas: 2000  }, baseBuildTimeSeconds: 900,  requiredShipyardLevel: 5  },
+}
+
+const SHIP_STATS: Record<string, { speed: number; cargo: number; attack: number; defense: number; miningYield: number }> = {
+  probe:         { speed: 15, cargo: 0,     attack: 0,   defense: 1,   miningYield: 0  },
+  small_fighter: { speed: 14, cargo: 50,    attack: 18,  defense: 10,  miningYield: 0  },
+  large_fighter: { speed: 8,  cargo: 200,   attack: 55,  defense: 40,  miningYield: 0  },
+  cruiser:       { speed: 7,  cargo: 400,   attack: 80,  defense: 70,  miningYield: 0  },
+  gunship:       { speed: 5,  cargo: 300,   attack: 150, defense: 100, miningYield: 0  },
+  destroyer:     { speed: 4,  cargo: 500,   attack: 300, defense: 200, miningYield: 0  },
+  harvester:     { speed: 6,  cargo: 0,     attack: 2,   defense: 10,  miningYield: 15 },
+  small_cargo:   { speed: 8,  cargo: 2000,  attack: 1,   defense: 8,   miningYield: 0  },
+  large_cargo:   { speed: 5,  cargo: 10000, attack: 2,   defense: 15,  miningYield: 0  },
+}
+
+const MISSION_CONFIGS: Record<string, { requiredShips: string[]; minDurationSeconds: number }> = {
+  mining:  { requiredShips: ['harvester'],     minDurationSeconds: 120 },
+  raid:    { requiredShips: ['small_fighter'], minDurationSeconds: 90  },
+  salvage: { requiredShips: ['small_cargo'],   minDurationSeconds: 60  },
+}
+
+const TECH_CONFIGS: Record<string, {
+  baseCost: { metal: number; gas: number }
+  baseTimeSeconds: number
+  maxLevel: number
+  requiredLabLevel: number
+  prerequisites: { techId: string; level: number }[]
+}> = {
+  reinforced_hulls:         { baseCost: { metal: 400,  gas: 200  }, baseTimeSeconds: 300, maxLevel: 10, requiredLabLevel: 1, prerequisites: [] },
+  advanced_weapons:         { baseCost: { metal: 500,  gas: 300  }, baseTimeSeconds: 360, maxLevel: 10, requiredLabLevel: 2, prerequisites: [] },
+  capital_ship_engineering: { baseCost: { metal: 2000, gas: 1500 }, baseTimeSeconds: 900, maxLevel: 5,  requiredLabLevel: 4, prerequisites: [{ techId: 'reinforced_hulls', level: 3 }] },
+  efficient_refining:       { baseCost: { metal: 300,  gas: 150  }, baseTimeSeconds: 240, maxLevel: 10, requiredLabLevel: 1, prerequisites: [] },
+  deep_core_mining:         { baseCost: { metal: 500,  gas: 250  }, baseTimeSeconds: 360, maxLevel: 10, requiredLabLevel: 3, prerequisites: [{ techId: 'efficient_refining', level: 3 }] },
+  expanded_storage:         { baseCost: { metal: 400,  gas: 200  }, baseTimeSeconds: 300, maxLevel: 10, requiredLabLevel: 2, prerequisites: [] },
+  rapid_extraction:         { baseCost: { metal: 600,  gas: 400  }, baseTimeSeconds: 420, maxLevel: 10, requiredLabLevel: 4, prerequisites: [{ techId: 'deep_core_mining', level: 2 }] },
+  long_range_sensors:       { baseCost: { metal: 350,  gas: 250  }, baseTimeSeconds: 300, maxLevel: 10, requiredLabLevel: 1, prerequisites: [] },
+  probe_durability:         { baseCost: { metal: 200,  gas: 100  }, baseTimeSeconds: 180, maxLevel: 5,  requiredLabLevel: 2, prerequisites: [] },
+  advanced_cartography:     { baseCost: { metal: 600,  gas: 500  }, baseTimeSeconds: 480, maxLevel: 5,  requiredLabLevel: 5, prerequisites: [{ techId: 'long_range_sensors', level: 4 }] },
+  solar_efficiency:         { baseCost: { metal: 300,  gas: 200  }, baseTimeSeconds: 240, maxLevel: 10, requiredLabLevel: 1, prerequisites: [] },
+  storm_hardening:          { baseCost: { metal: 800,  gas: 600  }, baseTimeSeconds: 600, maxLevel: 5,  requiredLabLevel: 3, prerequisites: [{ techId: 'solar_efficiency', level: 3 }] },
+  fusion_theory:            { baseCost: { metal: 1000, gas: 800  }, baseTimeSeconds: 720, maxLevel: 10, requiredLabLevel: 5, prerequisites: [{ techId: 'solar_efficiency', level: 5 }] },
+}
+
+// Galaxy map location types and their spawn weights
+const LOCATION_TYPES = [
+  { type: 'asteroid_field', weight: 40, richness: () => Math.floor(Math.random() * 5) + 1 },
+  { type: 'bandit_camp',    weight: 30, size: () => Math.random() < 0.5 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large' },
+  { type: 'debris_field',   weight: 20, metal: () => Math.floor(Math.random() * 500 + 100) },
+  { type: 'empty',          weight: 10 },
+]
+const TOTAL_LOCATION_WEIGHT = LOCATION_TYPES.reduce((s, t) => s + t.weight, 0)
+
+const LOCATION_NAMES: Record<string, string[]> = {
+  asteroid_field: ['Alpha Belt', 'Beta Cluster', 'Gamma Ridge', 'Delta Shoal', 'Epsilon Field', 'Zeta Expanse'],
+  bandit_camp:    ['Bandit Outpost', 'Raider Base', 'Pirate Stronghold', 'Marauder Den', 'Outlaw Station'],
+  debris_field:   ['Wreckage Field', 'Battle Debris', 'Scattered Ruins', 'Lost Fleet', 'Derelict Zone'],
+  empty:          ['Empty Sector', 'Void Passage', 'Silent Drift', 'Dark Expanse'],
+}
+
+const BANDIT_FLEETS: Record<string, { name: string; ships: Record<string, { count: number; hp: number; attack: number; defense: number }> }> = {
+  small:  { name: 'Small Bandit Patrol',  ships: { raider: { count: 3, hp: 20, attack: 8,  defense: 4  } } },
+  medium: { name: 'Bandit Squadron',      ships: { raider: { count: 5, hp: 20, attack: 8,  defense: 4  }, gunship: { count: 2, hp: 50, attack: 20, defense: 12 } } },
+  large:  { name: 'Bandit Armada',        ships: { raider: { count: 8, hp: 20, attack: 8,  defense: 4  }, gunship: { count: 4, hp: 50, attack: 20, defense: 12 }, destroyer: { count: 1, hp: 120, attack: 45, defense: 30 } } },
 }
 
 const DEV_RESOURCE_FLOOR = 10000
 
-// deno-lint-ignore no-explicit-any
-async function topUpDevResources(supabase: any, planetId: string) {
-  const { data: planet } = await supabase
-    .from('planets')
-    .select('metal_amount, gas_amount')
-    .eq('id', planetId)
-    .single()
-
-  const newMetal = Math.max(planet.metal_amount, DEV_RESOURCE_FLOOR)
-  const newGas = Math.max(planet.gas_amount, DEV_RESOURCE_FLOOR)
-
-  await supabase
-    .from('planets')
-    .update({ metal_amount: newMetal, gas_amount: newGas })
-    .eq('id', planetId)
-}
-
-// deno-lint-ignore no-explicit-any
-async function recalculateResources(supabase: any, planetId: string) {
-  const { data: planet } = await supabase
-    .from('planets')
-    .select('metal_amount, gas_amount, last_calculated_at')
-    .eq('id', planetId)
-    .single()
-
-  const { data: buildings } = await supabase
-    .from('planet_buildings')
-    .select('building_id, level')
-    .eq('planet_id', planetId)
-
-  const { data: weather } = await supabase
-    .from('planet_weather')
-    .select('metal_multiplier, gas_multiplier, energy_multiplier, expires_at')
-    .eq('planet_id', planetId)
-    .order('started_at', { ascending: false })
-    .limit(1)
-    .single()
-
-  const now = new Date()
-  const elapsed = (now.getTime() - new Date(planet.last_calculated_at).getTime()) / (1000 * 3600)
-
-  let totalMetalPerHour = 0
-  let totalGasPerHour = 0
-  let totalEnergyProduced = 0
-  let totalEnergyConsumed = 0
-
-  // deno-lint-ignore no-explicit-any
-  const buildingMap = new Map(buildings.map((b: any) => [b.building_id, b.level]))
-
-  for (const [id, level] of buildingMap) {
-    const config = BUILDINGS[id as string]
-    if (!config) continue
-    if (id === 'metal_mine') totalMetalPerHour += productionPerHour(config.baseProductionPerHour, level as number)
-    if (id === 'gas_refinery') totalGasPerHour += productionPerHour(config.baseProductionPerHour, level as number)
-    if (id === 'solar_array') totalEnergyProduced += productionPerHour(config.baseProductionPerHour, level as number)
-    totalEnergyConsumed += energyConsumption(config.baseEnergyConsumption, level as number)
-  }
-
-  // Base production floor — prevents getting stuck with zero resources
-  totalMetalPerHour = Math.max(totalMetalPerHour, BASE_METAL_PRODUCTION)
-  totalGasPerHour = Math.max(totalGasPerHour, BASE_GAS_PRODUCTION)
-
-  const energyRatio = totalEnergyConsumed <= 0 ? 1 : Math.min(1, totalEnergyProduced / totalEnergyConsumed)
-
-  const weatherActive = weather && (!weather.expires_at || new Date(weather.expires_at) > now)
-  const metalMult = weatherActive ? Number(weather.metal_multiplier) : 1
-  const gasMult = weatherActive ? Number(weather.gas_multiplier) : 1
-
-  const newMetal = planet.metal_amount + totalMetalPerHour * energyRatio * metalMult * elapsed
-  const newGas = planet.gas_amount + totalGasPerHour * energyRatio * gasMult * elapsed
-
-  await supabase
-    .from('planets')
-    .update({
-      metal_amount: newMetal,
-      gas_amount: newGas,
-      last_calculated_at: now.toISOString(),
-    })
-    .eq('id', planetId)
-
-  return { metal: newMetal, gas: newGas }
-}
-
-// deno-lint-ignore no-explicit-any
-async function handleStartBuild(supabase: any, userId: string, planetId: string, buildingId: string, devMode: boolean, cors: Record<string, string>) {
-  const { data: planet } = await supabase
-    .from('planets')
-    .select('id, player_id')
-    .eq('id', planetId)
-    .eq('player_id', userId)
-    .single()
-
-  if (!planet) {
-    return new Response(JSON.stringify({ error: 'Planet not found' }), {
-      status: 404,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const { data: activeBuilds } = await supabase
-    .from('construction_queue')
-    .select('id')
-    .eq('planet_id', planetId)
-
-  if (activeBuilds && activeBuilds.length > 0) {
-    return new Response(JSON.stringify({ error: 'Construction queue is full' }), {
-      status: 400,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const { data: building } = await supabase
-    .from('planet_buildings')
-    .select('level')
-    .eq('planet_id', planetId)
-    .eq('building_id', buildingId)
-    .single()
-
-  if (!building) {
-    return new Response(JSON.stringify({ error: 'Building not found on planet' }), {
-      status: 404,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const config = BUILDINGS[buildingId]
-  if (!config) {
-    return new Response(JSON.stringify({ error: 'Unknown building type' }), {
-      status: 400,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const targetLevel = building.level + 1
-  if (targetLevel > 20) {
-    return new Response(JSON.stringify({ error: 'Building is at max level' }), {
-      status: 400,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  if (config.prerequisites.length > 0) {
-    const { data: allBuildings } = await supabase
-      .from('planet_buildings')
-      .select('building_id, level')
-      .eq('planet_id', planetId)
-
-    // deno-lint-ignore no-explicit-any
-    const levelMap = new Map(allBuildings.map((b: any) => [b.building_id, b.level]))
-
-    for (const prereq of config.prerequisites) {
-      const currentLevel = levelMap.get(prereq.buildingId) ?? 0
-      if (currentLevel < prereq.level) {
-        return new Response(JSON.stringify({ error: `Requires ${prereq.buildingId} level ${prereq.level}` }), {
-          status: 400,
-          headers: { ...cors, 'Content-Type': 'application/json' },
-        })
-      }
-    }
-  }
-
-  if (devMode) await topUpDevResources(supabase, planetId)
-  const resources = await recalculateResources(supabase, planetId)
-
-  const metalCost = upgradeCost(config.baseCost.metal, targetLevel)
-  const gasCost = upgradeCost(config.baseCost.gas, targetLevel)
-
-  if (resources.metal < metalCost || resources.gas < gasCost) {
-    return new Response(JSON.stringify({
-      error: 'Insufficient resources',
-      required: { metal: metalCost, gas: gasCost },
-      available: resources,
-    }), {
-      status: 400,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  await supabase
-    .from('planets')
-    .update({
-      metal_amount: resources.metal - metalCost,
-      gas_amount: resources.gas - gasCost,
-    })
-    .eq('id', planetId)
-
-  const buildTime = devMode ? 10 : buildTimeSeconds(config.baseBuildTimeSeconds, targetLevel)
-  const now = new Date()
-  const completesAt = new Date(now.getTime() + buildTime * 1000)
-
-  await supabase.from('construction_queue').insert({
-    planet_id: planetId,
-    building_id: buildingId,
-    target_level: targetLevel,
-    started_at: now.toISOString(),
-    completes_at: completesAt.toISOString(),
-  })
-
-  await supabase.from('planet_events').insert({
-    planet_id: planetId,
-    event_type: 'build_started',
-    message: `Started upgrading ${buildingId} to level ${targetLevel}`,
-    metadata: { building_id: buildingId, target_level: targetLevel },
-  })
-
-  return new Response(JSON.stringify({ success: true, completesAt: completesAt.toISOString() }), {
-    headers: { ...cors, 'Content-Type': 'application/json' },
-  })
-}
-
-// deno-lint-ignore no-explicit-any
-async function handleCompleteBuild(supabase: any, userId: string, planetId: string, cors: Record<string, string>) {
-  const { data: planet } = await supabase
-    .from('planets')
-    .select('id')
-    .eq('id', planetId)
-    .eq('player_id', userId)
-    .single()
-
-  if (!planet) {
-    return new Response(JSON.stringify({ error: 'Planet not found' }), {
-      status: 404,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const now = new Date()
-  const { data: completedBuilds } = await supabase
-    .from('construction_queue')
-    .select('*')
-    .eq('planet_id', planetId)
-    .lte('completes_at', now.toISOString())
-
-  if (!completedBuilds || completedBuilds.length === 0) {
-    return new Response(JSON.stringify({ success: true, completed: [] }), {
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const completed = []
-
-  // deno-lint-ignore no-explicit-any
-  for (const build of completedBuilds as any[]) {
-    await supabase
-      .from('planet_buildings')
-      .update({ level: build.target_level, updated_at: now.toISOString() })
-      .eq('planet_id', planetId)
-      .eq('building_id', build.building_id)
-
-    await supabase
-      .from('construction_queue')
-      .delete()
-      .eq('id', build.id)
-
-    await supabase.from('planet_events').insert({
-      planet_id: planetId,
-      event_type: 'build_completed',
-      message: `${build.building_id} upgraded to level ${build.target_level}`,
-      metadata: { building_id: build.building_id, level: build.target_level },
-    })
-
-    completed.push({ buildingId: build.building_id, level: build.target_level })
-  }
-
-  await recalculateResources(supabase, planetId)
-
-  return new Response(JSON.stringify({ success: true, completed }), {
-    headers: { ...cors, 'Content-Type': 'application/json' },
-  })
-}
-
-// deno-lint-ignore no-explicit-any
-async function handleStartShipBuild(supabase: any, userId: string, planetId: string, shipType: string, quantity: number, devMode: boolean, cors: Record<string, string>) {
-  const { data: planet } = await supabase
-    .from('planets')
-    .select('id, player_id')
-    .eq('id', planetId)
-    .eq('player_id', userId)
-    .single()
-
-  if (!planet) {
-    return new Response(JSON.stringify({ error: 'Planet not found' }), {
-      status: 404,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const shipConfig = SHIPS[shipType]
-  if (!shipConfig) {
-    return new Response(JSON.stringify({ error: 'Unknown ship type' }), {
-      status: 400,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const { data: activeShipBuilds } = await supabase
-    .from('ship_queue')
-    .select('id')
-    .eq('planet_id', planetId)
-
-  if (activeShipBuilds && activeShipBuilds.length > 0) {
-    return new Response(JSON.stringify({ error: 'Ship queue is full' }), {
-      status: 400,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const { data: shipyardBuilding } = await supabase
-    .from('planet_buildings')
-    .select('level')
-    .eq('planet_id', planetId)
-    .eq('building_id', 'shipyard')
-    .single()
-
-  const shipyardLevel = shipyardBuilding?.level ?? 0
-
-  if (shipyardLevel < shipConfig.requiredShipyardLevel) {
-    return new Response(JSON.stringify({ error: `Requires Shipyard level ${shipConfig.requiredShipyardLevel}` }), {
-      status: 400,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  if (devMode) await topUpDevResources(supabase, planetId)
-  const resources = await recalculateResources(supabase, planetId)
-
-  const metalCost = shipConfig.cost.metal * quantity
-  const gasCost = shipConfig.cost.gas * quantity
-
-  if (resources.metal < metalCost || resources.gas < gasCost) {
-    return new Response(JSON.stringify({
-      error: 'Insufficient resources',
-      required: { metal: metalCost, gas: gasCost },
-      available: resources,
-    }), {
-      status: 400,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  await supabase
-    .from('planets')
-    .update({
-      metal_amount: resources.metal - metalCost,
-      gas_amount: resources.gas - gasCost,
-    })
-    .eq('id', planetId)
-
-  const buildTime = devMode ? 10 : shipBuildTimeSeconds(shipConfig.baseBuildTimeSeconds, shipyardLevel) * quantity
-  const now = new Date()
-  const completesAt = new Date(now.getTime() + buildTime * 1000)
-
-  await supabase.from('ship_queue').insert({
-    planet_id: planetId,
-    ship_type: shipType,
-    quantity,
-    started_at: now.toISOString(),
-    completes_at: completesAt.toISOString(),
-  })
-
-  await supabase.from('planet_events').insert({
-    planet_id: planetId,
-    event_type: 'ship_build_started',
-    message: `Started building ${quantity} ${shipType}`,
-    metadata: { ship_type: shipType, quantity },
-  })
-
-  return new Response(JSON.stringify({ success: true, completesAt: completesAt.toISOString() }), {
-    headers: { ...cors, 'Content-Type': 'application/json' },
-  })
-}
-
-// deno-lint-ignore no-explicit-any
-async function handleCompleteShipBuild(supabase: any, userId: string, planetId: string, cors: Record<string, string>) {
-  const { data: planet } = await supabase
-    .from('planets')
-    .select('id')
-    .eq('id', planetId)
-    .eq('player_id', userId)
-    .single()
-
-  if (!planet) {
-    return new Response(JSON.stringify({ error: 'Planet not found' }), {
-      status: 404,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const now = new Date()
-  const { data: completedBuilds } = await supabase
-    .from('ship_queue')
-    .select('*')
-    .eq('planet_id', planetId)
-    .lte('completes_at', now.toISOString())
-
-  if (!completedBuilds || completedBuilds.length === 0) {
-    return new Response(JSON.stringify({ success: true, completed: [] }), {
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const completed = []
-
-  // deno-lint-ignore no-explicit-any
-  for (const build of completedBuilds as any[]) {
-    const { data: existing } = await supabase
-      .from('planet_ships')
-      .select('count')
-      .eq('planet_id', planetId)
-      .eq('ship_type', build.ship_type)
-      .single()
-
-    const currentCount = existing?.count ?? 0
-
-    await supabase
-      .from('planet_ships')
-      .upsert({
-        planet_id: planetId,
-        ship_type: build.ship_type,
-        count: currentCount + build.quantity,
-        updated_at: now.toISOString(),
-      }, { onConflict: 'planet_id,ship_type' })
-
-    await supabase
-      .from('ship_queue')
-      .delete()
-      .eq('id', build.id)
-
-    await supabase.from('planet_events').insert({
-      planet_id: planetId,
-      event_type: 'ship_build_completed',
-      message: `${build.quantity} ${build.ship_type} completed`,
-      metadata: { ship_type: build.ship_type, quantity: build.quantity },
-    })
-
-    completed.push({ shipType: build.ship_type, quantity: build.quantity })
-  }
-
-  return new Response(JSON.stringify({ success: true, completed }), {
-    headers: { ...cors, 'Content-Type': 'application/json' },
-  })
-}
-
-// ==================== MISSION SYSTEM ====================
-
-const SECTOR_NAMES_PREFIX = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Theta', 'Kappa', 'Sigma', 'Omega']
-const SECTOR_NAMES_SUFFIX = ['Drift', 'Reach', 'Expanse', 'Void', 'Belt', 'Cluster', 'Field', 'Nebula', 'Ridge', 'Shoal']
-const SECTOR_TYPES = ['asteroid_field', 'nebula', 'debris_field']
-
-const MISSION_CONFIGS: Record<string, {
-  requiredShips: string[]; minDurationSeconds: number; discoversLocations: boolean
-}> = {
-  mining: { requiredShips: ['transport', 'explorer'], minDurationSeconds: 120, discoversLocations: false },
-  scout_patrol: { requiredShips: ['scout'], minDurationSeconds: 60, discoversLocations: true },
-  expedition: { requiredShips: ['explorer'], minDurationSeconds: 180, discoversLocations: true },
-  raid: { requiredShips: ['small_fighter', 'large_fighter'], minDurationSeconds: 90, discoversLocations: false },
-}
-
-const SHIP_STATS: Record<string, { speed: number; cargo: number; attack: number; defense: number; miningYield: number }> = {
-  probe:          { speed: 8,  cargo: 0,    attack: 0,  defense: 1,  miningYield: 0 },
-  scout:          { speed: 12, cargo: 100,  attack: 2,  defense: 3,  miningYield: 0 },
-  explorer:       { speed: 9,  cargo: 500,  attack: 5,  defense: 8,  miningYield: 5 },
-  small_fighter:  { speed: 14, cargo: 50,   attack: 18, defense: 10, miningYield: 0 },
-  large_fighter:  { speed: 8,  cargo: 200,  attack: 55, defense: 40, miningYield: 0 },
-  transport:      { speed: 5,  cargo: 5000, attack: 2,  defense: 15, miningYield: 10 },
-}
-
-const BANDIT_FLEETS_MISSION: Record<string, { name: string; ships: Record<string, { count: number; hp: number; attack: number; defense: number }> }> = {
-  small: { name: 'Small Bandit Patrol', ships: { raider: { count: 3, hp: 20, attack: 8, defense: 4 } } },
-  medium: { name: 'Bandit Squadron', ships: { raider: { count: 5, hp: 20, attack: 8, defense: 4 }, gunship: { count: 2, hp: 50, attack: 20, defense: 12 } } },
-  large: { name: 'Bandit Armada', ships: { raider: { count: 8, hp: 20, attack: 8, defense: 4 }, gunship: { count: 4, hp: 50, attack: 20, defense: 12 }, destroyer: { count: 1, hp: 120, attack: 45, defense: 30 } } },
-}
-
-const EXPEDITION_WEIGHTS: Record<string, number> = { mining_site: 30, bandits: 25, asteroid: 20, nothing: 25 }
-
-function randomSectorName(): string {
-  const p = SECTOR_NAMES_PREFIX[Math.floor(Math.random() * SECTOR_NAMES_PREFIX.length)]
-  const s = SECTOR_NAMES_SUFFIX[Math.floor(Math.random() * SECTOR_NAMES_SUFFIX.length)]
-  return `${p} ${s}`
-}
+// ============================================================
+// Utility helpers
+// ============================================================
 
 function parseCoord(coord: string): { galaxy: number; system: number; position: number } {
   const [g, s, p] = coord.split(':').map(Number)
@@ -650,17 +252,71 @@ function fleetTotalStat(fleet: Record<string, number>, stat: 'attack' | 'defense
   return total
 }
 
-function weightedRandom(weights: Record<string, number>): string {
-  const total = Object.values(weights).reduce((a, b) => a + b, 0)
-  let roll = Math.random() * total
-  for (const [key, weight] of Object.entries(weights)) {
-    roll -= weight
-    if (roll <= 0) return key
+function rollLocationType(): string {
+  let roll = Math.random() * TOTAL_LOCATION_WEIGHT
+  for (const t of LOCATION_TYPES) {
+    roll -= t.weight
+    if (roll <= 0) return t.type
   }
-  return Object.keys(weights)[0]
+  return 'empty'
 }
 
-// --- Combat Resolver ---
+function randomLocationName(locationType: string): string {
+  const names = LOCATION_NAMES[locationType] ?? LOCATION_NAMES.empty
+  const suffix = String.fromCharCode(65 + Math.floor(Math.random() * 26))
+  const num = Math.floor(Math.random() * 99) + 1
+  return `${names[Math.floor(Math.random() * names.length)]} ${suffix}-${num}`
+}
+
+// deno-lint-ignore no-explicit-any
+async function topUpDevResources(supabase: any, planetId: string) {
+  const { data: planet } = await supabase.from('planets').select('metal_amount, gas_amount').eq('id', planetId).single()
+  await supabase.from('planets').update({
+    metal_amount: Math.max(planet.metal_amount, DEV_RESOURCE_FLOOR),
+    gas_amount: Math.max(planet.gas_amount, DEV_RESOURCE_FLOOR),
+  }).eq('id', planetId)
+}
+
+// deno-lint-ignore no-explicit-any
+async function recalculateResources(supabase: any, planetId: string): Promise<{ metal: number; gas: number }> {
+  const { data: planet } = await supabase.from('planets').select('metal_amount, gas_amount, last_calculated_at').eq('id', planetId).single()
+  const { data: buildings } = await supabase.from('planet_buildings').select('building_id, level').eq('planet_id', planetId)
+  const { data: weather } = await supabase.from('planet_weather').select('metal_multiplier, gas_multiplier, energy_multiplier, expires_at').eq('planet_id', planetId).order('started_at', { ascending: false }).limit(1).single()
+
+  const now = new Date()
+  const elapsed = (now.getTime() - new Date(planet.last_calculated_at).getTime()) / (1000 * 3600)
+
+  let totalMetalPerHour = 0, totalGasPerHour = 0, totalEnergyProduced = 0, totalEnergyConsumed = 0
+  // deno-lint-ignore no-explicit-any
+  const buildingMap = new Map(buildings.map((b: any) => [b.building_id, b.level]))
+
+  for (const [id, level] of buildingMap) {
+    const config = BUILDINGS[id as string]
+    if (!config) continue
+    if (id === 'metal_mine')  totalMetalPerHour  += productionPerHour(config.baseProductionPerHour, level as number)
+    if (id === 'gas_refinery') totalGasPerHour   += productionPerHour(config.baseProductionPerHour, level as number)
+    if (id === 'solar_array')  totalEnergyProduced += productionPerHour(config.baseProductionPerHour, level as number)
+    totalEnergyConsumed += energyConsumption(config.baseEnergyConsumption, level as number)
+  }
+
+  totalMetalPerHour = Math.max(totalMetalPerHour, BASE_METAL_PRODUCTION)
+  totalGasPerHour = Math.max(totalGasPerHour, BASE_GAS_PRODUCTION)
+  const energyRatio = totalEnergyConsumed <= 0 ? 1 : Math.min(1, totalEnergyProduced / totalEnergyConsumed)
+
+  const weatherActive = weather && (!weather.expires_at || new Date(weather.expires_at) > now)
+  const metalMult = weatherActive ? Number(weather.metal_multiplier) : 1
+  const gasMult = weatherActive ? Number(weather.gas_multiplier) : 1
+
+  const newMetal = planet.metal_amount + totalMetalPerHour * energyRatio * metalMult * elapsed
+  const newGas = planet.gas_amount + totalGasPerHour * energyRatio * gasMult * elapsed
+
+  await supabase.from('planets').update({ metal_amount: newMetal, gas_amount: newGas, last_calculated_at: now.toISOString() }).eq('id', planetId)
+  return { metal: newMetal, gas: newGas }
+}
+
+// ============================================================
+// Combat resolver
+// ============================================================
 
 type CombatUnit = { type: string; hp: number; attack: number; defense: number }
 
@@ -690,19 +346,19 @@ function resolveCombat(
   const defenderLosses: Record<string, number> = {}
 
   for (let round = 1; round <= 10; round++) {
-    const aliveAttackers = attackers.filter(u => u.hp > 0)
-    const aliveDefenders = defenders.filter(u => u.hp > 0)
-    if (aliveAttackers.length === 0 || aliveDefenders.length === 0) break
+    const aliveA = attackers.filter(u => u.hp > 0)
+    const aliveD = defenders.filter(u => u.hp > 0)
+    if (aliveA.length === 0 || aliveD.length === 0) break
 
     // deno-lint-ignore no-explicit-any
     const attackerFire: any[] = []
     // deno-lint-ignore no-explicit-any
     const defenderFire: any[] = []
 
-    for (const a of aliveAttackers) {
-      const t = aliveDefenders.filter(d => d.hp > 0)
-      if (t.length === 0) break
-      const target = t[Math.floor(Math.random() * t.length)]
+    for (const a of aliveA) {
+      const targets = defenders.filter(d => d.hp > 0)
+      if (targets.length === 0) break
+      const target = targets[Math.floor(Math.random() * targets.length)]
       const damage = Math.max(1, a.attack - Math.floor(target.defense * 0.3))
       target.hp -= damage
       const destroyed = target.hp <= 0
@@ -710,10 +366,9 @@ function resolveCombat(
       if (destroyed) defenderLosses[target.type] = (defenderLosses[target.type] ?? 0) + 1
     }
 
-    const stillAlive = attackers.filter(u => u.hp > 0)
-    for (const d of aliveDefenders.filter(d => d.hp > 0)) {
-      if (stillAlive.filter(u => u.hp > 0).length === 0) break
-      const targets = stillAlive.filter(u => u.hp > 0)
+    for (const d of aliveD.filter(d => d.hp > 0)) {
+      const targets = attackers.filter(u => u.hp > 0)
+      if (targets.length === 0) break
       const target = targets[Math.floor(Math.random() * targets.length)]
       const damage = Math.max(1, d.attack - Math.floor(target.defense * 0.3))
       target.hp -= damage
@@ -731,80 +386,328 @@ function resolveCombat(
   return { victory, rounds, attackerLosses, defenderLosses }
 }
 
-// --- Mission Handlers ---
+// ============================================================
+// Building handlers
+// ============================================================
 
 // deno-lint-ignore no-explicit-any
-async function handleGenerateSectors(supabase: any, userId: string, planetId: string, cors: Record<string, string>) {
-  const { data: planet } = await supabase
-    .from('planets')
-    .select('id, player_id, coordinates')
-    .eq('id', planetId)
-    .eq('player_id', userId)
-    .single()
+async function handleStartBuild(supabase: any, userId: string, planetId: string, buildingId: string, devMode: boolean, cors: Record<string, string>) {
+  const { data: planet } = await supabase.from('planets').select('id, player_id').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-  if (!planet) {
-    return new Response(JSON.stringify({ error: 'Planet not found' }), {
-      status: 404, headers: { ...cors, 'Content-Type': 'application/json' },
-    })
+  const { data: activeBuilds } = await supabase.from('construction_queue').select('id').eq('planet_id', planetId)
+  if (activeBuilds && activeBuilds.length > 0) return new Response(JSON.stringify({ error: 'Construction queue is full' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const { data: building } = await supabase.from('planet_buildings').select('level').eq('planet_id', planetId).eq('building_id', buildingId).single()
+  if (!building) return new Response(JSON.stringify({ error: 'Building not found on planet' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const config = BUILDINGS[buildingId]
+  if (!config) return new Response(JSON.stringify({ error: 'Unknown building type' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const targetLevel = building.level + 1
+  if (targetLevel > 20) return new Response(JSON.stringify({ error: 'Building is at max level' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  if (config.prerequisites.length > 0) {
+    const { data: allBuildings } = await supabase.from('planet_buildings').select('building_id, level').eq('planet_id', planetId)
+    // deno-lint-ignore no-explicit-any
+    const levelMap = new Map(allBuildings.map((b: any) => [b.building_id, b.level]))
+    for (const prereq of config.prerequisites) {
+      if ((levelMap.get(prereq.buildingId) ?? 0) < prereq.level) {
+        return new Response(JSON.stringify({ error: `Requires ${prereq.buildingId} level ${prereq.level}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+      }
+    }
   }
 
-  await supabase.from('nearby_sectors').delete().eq('planet_id', planetId).lte('expires_at', new Date().toISOString())
-
-  const { data: existing } = await supabase
-    .from('nearby_sectors').select('id').eq('planet_id', planetId).gte('expires_at', new Date().toISOString())
-
-  if (existing && existing.length >= 5) {
-    return new Response(JSON.stringify({ success: true, message: 'Sectors already fresh' }), {
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    })
+  if (devMode) await topUpDevResources(supabase, planetId)
+  const resources = await recalculateResources(supabase, planetId)
+  const metalCost = upgradeCost(config.baseCost.metal, targetLevel)
+  const gasCost = upgradeCost(config.baseCost.gas, targetLevel)
+  if (resources.metal < metalCost || resources.gas < gasCost) {
+    return new Response(JSON.stringify({ error: 'Insufficient resources', required: { metal: metalCost, gas: gasCost }, available: resources }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
   }
 
-  const homeCoord = parseCoord(planet.coordinates)
-  const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString()
-  const sectors = []
-  for (let i = 0; i < 5; i++) {
-    const dist = Math.floor(Math.random() * 46) + 5
-    const dir = Math.random() > 0.5 ? 1 : -1
-    const coords = `${homeCoord.galaxy}:${Math.max(1, homeCoord.system + dist * dir)}:${Math.floor(Math.random() * 15) + 1}`
-    sectors.push({
-      planet_id: planetId, coordinates: coords, name: randomSectorName(),
-      sector_type: SECTOR_TYPES[Math.floor(Math.random() * SECTOR_TYPES.length)],
-      distance: dist, richness: Math.floor(Math.random() * 5) + 1,
-      danger_level: Math.floor(Math.random() * 6), expires_at: expiresAt,
-    })
-  }
+  await supabase.from('planets').update({ metal_amount: resources.metal - metalCost, gas_amount: resources.gas - gasCost }).eq('id', planetId)
 
-  await supabase.from('nearby_sectors').upsert(sectors, { onConflict: 'planet_id,coordinates' })
+  const buildTime = devMode ? 10 : buildTimeSeconds(config.baseBuildTimeSeconds, targetLevel)
+  const now = new Date()
+  const completesAt = new Date(now.getTime() + buildTime * 1000)
 
-  return new Response(JSON.stringify({ success: true, generated: sectors.length }), {
-    headers: { ...cors, 'Content-Type': 'application/json' },
-  })
+  await supabase.from('construction_queue').insert({ planet_id: planetId, building_id: buildingId, target_level: targetLevel, started_at: now.toISOString(), completes_at: completesAt.toISOString() })
+  await supabase.from('planet_events').insert({ planet_id: planetId, event_type: 'build_started', message: `Started upgrading ${buildingId} to level ${targetLevel}`, metadata: { building_id: buildingId, target_level: targetLevel } })
+
+  return new Response(JSON.stringify({ success: true, completesAt: completesAt.toISOString() }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }
 
 // deno-lint-ignore no-explicit-any
-async function handleDispatchMission(supabase: any, userId: string, planetId: string, missionType: string, fleet: Record<string, number>, targetCoords: string, devMode: boolean, cors: Record<string, string>) {
-  const { data: planet } = await supabase
-    .from('planets').select('id, player_id, coordinates').eq('id', planetId).eq('player_id', userId).single()
+async function handleCompleteBuild(supabase: any, userId: string, planetId: string, cors: Record<string, string>) {
+  const { data: planet } = await supabase.from('planets').select('id').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-  if (!planet) {
-    return new Response(JSON.stringify({ error: 'Planet not found' }), {
-      status: 404, headers: { ...cors, 'Content-Type': 'application/json' },
-    })
+  const now = new Date()
+  const { data: completedBuilds } = await supabase.from('construction_queue').select('*').eq('planet_id', planetId).lte('completes_at', now.toISOString())
+  if (!completedBuilds || completedBuilds.length === 0) return new Response(JSON.stringify({ success: true, completed: [] }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const completed = []
+  // deno-lint-ignore no-explicit-any
+  for (const build of completedBuilds as any[]) {
+    await supabase.from('planet_buildings').update({ level: build.target_level, updated_at: now.toISOString() }).eq('planet_id', planetId).eq('building_id', build.building_id)
+    await supabase.from('construction_queue').delete().eq('id', build.id)
+    await supabase.from('planet_events').insert({ planet_id: planetId, event_type: 'build_completed', message: `${build.building_id} upgraded to level ${build.target_level}`, metadata: { building_id: build.building_id, level: build.target_level } })
+    completed.push({ buildingId: build.building_id, level: build.target_level })
   }
+
+  await recalculateResources(supabase, planetId)
+  return new Response(JSON.stringify({ success: true, completed }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// ============================================================
+// Ship build handlers
+// ============================================================
+
+// deno-lint-ignore no-explicit-any
+async function handleStartShipBuild(supabase: any, userId: string, planetId: string, shipType: string, quantity: number, devMode: boolean, cors: Record<string, string>) {
+  const { data: planet } = await supabase.from('planets').select('id, player_id').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const shipConfig = SHIPS[shipType]
+  if (!shipConfig) return new Response(JSON.stringify({ error: 'Unknown ship type' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const { data: activeShipBuilds } = await supabase.from('ship_queue').select('id').eq('planet_id', planetId)
+  if (activeShipBuilds && activeShipBuilds.length > 0) return new Response(JSON.stringify({ error: 'Ship queue is full' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const { data: shipyardBuilding } = await supabase.from('planet_buildings').select('level').eq('planet_id', planetId).eq('building_id', 'shipyard').single()
+  const shipyardLevel = shipyardBuilding?.level ?? 0
+  if (shipyardLevel < shipConfig.requiredShipyardLevel) {
+    return new Response(JSON.stringify({ error: `Requires Shipyard level ${shipConfig.requiredShipyardLevel}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Check tech requirements for capital ships
+  if (shipConfig.requiredTech) {
+    const { data: techRow } = await supabase.from('player_technologies').select('level').eq('player_id', userId).eq('tech_id', shipConfig.requiredTech.techId).single()
+    const techLevel = techRow?.level ?? 0
+    if (techLevel < shipConfig.requiredTech.level) {
+      return new Response(JSON.stringify({ error: `Requires ${shipConfig.requiredTech.techId} level ${shipConfig.requiredTech.level}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+    }
+  }
+
+  if (devMode) await topUpDevResources(supabase, planetId)
+  const resources = await recalculateResources(supabase, planetId)
+  const metalCost = shipConfig.cost.metal * quantity
+  const gasCost = shipConfig.cost.gas * quantity
+  if (resources.metal < metalCost || resources.gas < gasCost) {
+    return new Response(JSON.stringify({ error: 'Insufficient resources', required: { metal: metalCost, gas: gasCost }, available: resources }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  await supabase.from('planets').update({ metal_amount: resources.metal - metalCost, gas_amount: resources.gas - gasCost }).eq('id', planetId)
+
+  const buildTime = devMode ? 10 : shipBuildTimeSeconds(shipConfig.baseBuildTimeSeconds, shipyardLevel) * quantity
+  const now = new Date()
+  const completesAt = new Date(now.getTime() + buildTime * 1000)
+
+  await supabase.from('ship_queue').insert({ planet_id: planetId, ship_type: shipType, quantity, started_at: now.toISOString(), completes_at: completesAt.toISOString() })
+  await supabase.from('planet_events').insert({ planet_id: planetId, event_type: 'ship_build_started', message: `Started building ${quantity} ${shipType}`, metadata: { ship_type: shipType, quantity } })
+
+  return new Response(JSON.stringify({ success: true, completesAt: completesAt.toISOString() }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleCompleteShipBuild(supabase: any, userId: string, planetId: string, cors: Record<string, string>) {
+  const { data: planet } = await supabase.from('planets').select('id').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const now = new Date()
+  const { data: completedBuilds } = await supabase.from('ship_queue').select('*').eq('planet_id', planetId).lte('completes_at', now.toISOString())
+  if (!completedBuilds || completedBuilds.length === 0) return new Response(JSON.stringify({ success: true, completed: [] }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const completed = []
+  // deno-lint-ignore no-explicit-any
+  for (const build of completedBuilds as any[]) {
+    const { data: existing } = await supabase.from('planet_ships').select('count').eq('planet_id', planetId).eq('ship_type', build.ship_type).single()
+    const currentCount = existing?.count ?? 0
+    await supabase.from('planet_ships').upsert({ planet_id: planetId, ship_type: build.ship_type, count: currentCount + build.quantity, updated_at: now.toISOString() }, { onConflict: 'planet_id,ship_type' })
+    await supabase.from('ship_queue').delete().eq('id', build.id)
+    await supabase.from('planet_events').insert({ planet_id: planetId, event_type: 'ship_build_completed', message: `${build.quantity} ${build.ship_type} completed`, metadata: { ship_type: build.ship_type, quantity: build.quantity } })
+    completed.push({ shipType: build.ship_type, quantity: build.quantity })
+  }
+
+  return new Response(JSON.stringify({ success: true, completed }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// ============================================================
+// Galaxy Map handlers
+// ============================================================
+
+// deno-lint-ignore no-explicit-any
+async function handleRunRadar(supabase: any, userId: string, planetId: string, cors: Record<string, string>) {
+  const { data: planet } = await supabase.from('planets').select('id, player_id, coordinates').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const { data: radarBuilding } = await supabase.from('planet_buildings').select('level').eq('planet_id', planetId).eq('building_id', 'radar_array').single()
+  const radarLevel = radarBuilding?.level ?? 0
+  if (radarLevel < 1) return new Response(JSON.stringify({ error: 'Radar Array not built' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const homeCoord = parseCoord(planet.coordinates)
+  const detectCount = radarLevel * 3  // 3 detections per radar level per scan
+  const now = new Date()
+  const detected = []
+
+  for (let i = 0; i < detectCount; i++) {
+    const maxRange = radarLevel * 20
+    const dist = Math.floor(Math.random() * maxRange) + 5
+    const dir = Math.random() > 0.5 ? 1 : -1
+    const sysOff = Math.floor(Math.random() * dist + 1) * dir
+    const coords = `${homeCoord.galaxy}:${Math.max(1, homeCoord.system + sysOff)}:${Math.floor(Math.random() * 15) + 1}`
+
+    await supabase.from('galaxy_map').upsert({
+      player_id: userId,
+      coordinates: coords,
+      visibility: 'detected',
+      detected_at: now.toISOString(),
+    }, { onConflict: 'player_id,coordinates', ignoreDuplicates: true })  // don't overwrite revealed entries
+
+    detected.push(coords)
+  }
+
+  await supabase.from('planet_events').insert({ planet_id: planetId, event_type: 'radar_scan', message: `Radar Array detected ${detected.length} coordinates`, metadata: { coordinates: detected } })
+
+  return new Response(JSON.stringify({ success: true, detected: detected.length }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleSendProbe(supabase: any, userId: string, planetId: string, targetCoords: string, cors: Record<string, string>) {
+  const { data: planet } = await supabase.from('planets').select('id, player_id').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Check probe availability
+  const { data: probeRow } = await supabase.from('planet_ships').select('count').eq('planet_id', planetId).eq('ship_type', 'probe').single()
+  const probeCount = probeRow?.count ?? 0
+  if (probeCount < 1) return new Response(JSON.stringify({ error: 'No probes available' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Check galaxy_map entry exists
+  const { data: mapEntry } = await supabase.from('galaxy_map').select('id, visibility').eq('player_id', userId).eq('coordinates', targetCoords).single()
+  if (!mapEntry) return new Response(JSON.stringify({ error: 'Coordinate not detected — run Radar Array first' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  if (mapEntry.visibility === 'revealed') return new Response(JSON.stringify({ error: 'Already revealed' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Consume probe (probes are not returned — consumed on use)
+  await supabase.from('planet_ships').update({ count: probeCount - 1 }).eq('planet_id', planetId).eq('ship_type', 'probe')
+
+  // Roll location type and reveal
+  const locationType = rollLocationType()
+  const name = randomLocationName(locationType)
+  const now = new Date()
+
+  // deno-lint-ignore no-explicit-any
+  const metadata: Record<string, any> = {}
+  if (locationType === 'asteroid_field') metadata.richness = Math.floor(Math.random() * 5) + 1
+  if (locationType === 'bandit_camp') metadata.size = Math.random() < 0.5 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large'
+  if (locationType === 'debris_field') metadata.salvage_metal = Math.floor(Math.random() * 800 + 200)
+
+  await supabase.from('galaxy_map').update({
+    visibility: 'revealed',
+    location_type: locationType,
+    name,
+    metadata,
+    revealed_at: now.toISOString(),
+    cleared_at: null,
+    respawns_at: null,
+  }).eq('id', mapEntry.id)
+
+  await supabase.from('planet_events').insert({ planet_id: planetId, event_type: 'probe_returned', message: `Probe revealed: ${name} at ${targetCoords}`, metadata: { coordinates: targetCoords, location_type: locationType, name } })
+
+  return new Response(JSON.stringify({ success: true, location_type: locationType, name }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// ============================================================
+// Research handlers
+// ============================================================
+
+// deno-lint-ignore no-explicit-any
+async function handleStartResearch(supabase: any, userId: string, planetId: string, techId: string, devMode: boolean, cors: Record<string, string>) {
+  const { data: planet } = await supabase.from('planets').select('id, player_id').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const tech = TECH_CONFIGS[techId]
+  if (!tech) return new Response(JSON.stringify({ error: 'Unknown technology' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Check: no active research
+  const { data: activeResearch } = await supabase.from('research_queue').select('id').eq('player_id', userId)
+  if (activeResearch && activeResearch.length > 0) return new Response(JSON.stringify({ error: 'Research already in progress' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Check: research lab level
+  const { data: labBuilding } = await supabase.from('planet_buildings').select('level').eq('planet_id', planetId).eq('building_id', 'research_lab').single()
+  const labLevel = labBuilding?.level ?? 0
+  if (labLevel < tech.requiredLabLevel) return new Response(JSON.stringify({ error: `Requires Research Lab level ${tech.requiredLabLevel}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Check: current level and max
+  const { data: techRow } = await supabase.from('player_technologies').select('level').eq('player_id', userId).eq('tech_id', techId).single()
+  const currentLevel = techRow?.level ?? 0
+  if (currentLevel >= tech.maxLevel) return new Response(JSON.stringify({ error: 'Technology is at max level' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Check: prerequisites
+  for (const prereq of tech.prerequisites) {
+    const { data: prereqRow } = await supabase.from('player_technologies').select('level').eq('player_id', userId).eq('tech_id', prereq.techId).single()
+    if ((prereqRow?.level ?? 0) < prereq.level) {
+      return new Response(JSON.stringify({ error: `Requires ${prereq.techId} level ${prereq.level}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+    }
+  }
+
+  if (devMode) await topUpDevResources(supabase, planetId)
+  const resources = await recalculateResources(supabase, planetId)
+  const targetLevel = currentLevel + 1
+  const cost = researchCost(tech.baseCost.metal, tech.baseCost.gas, targetLevel)
+
+  if (resources.metal < cost.metal || resources.gas < cost.gas) {
+    return new Response(JSON.stringify({ error: 'Insufficient resources', required: cost, available: resources }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  await supabase.from('planets').update({ metal_amount: resources.metal - cost.metal, gas_amount: resources.gas - cost.gas }).eq('id', planetId)
+
+  const researchTime = devMode ? 10 : researchTimeSeconds(tech.baseTimeSeconds, targetLevel)
+  const now = new Date()
+  const completesAt = new Date(now.getTime() + researchTime * 1000)
+
+  await supabase.from('research_queue').insert({ player_id: userId, tech_id: techId, target_level: targetLevel, started_at: now.toISOString(), completes_at: completesAt.toISOString() })
+  await supabase.from('planet_events').insert({ planet_id: planetId, event_type: 'research_started', message: `Researching ${techId} to level ${targetLevel}`, metadata: { tech_id: techId, target_level: targetLevel } })
+
+  return new Response(JSON.stringify({ success: true, completesAt: completesAt.toISOString() }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleCompleteResearch(supabase: any, userId: string, cors: Record<string, string>) {
+  const now = new Date()
+  const { data: completedResearch } = await supabase.from('research_queue').select('*').eq('player_id', userId).lte('completes_at', now.toISOString())
+  if (!completedResearch || completedResearch.length === 0) return new Response(JSON.stringify({ success: true, completed: [] }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const completed = []
+  // deno-lint-ignore no-explicit-any
+  for (const r of completedResearch as any[]) {
+    await supabase.from('player_technologies').upsert({ player_id: userId, tech_id: r.tech_id, level: r.target_level, updated_at: now.toISOString() }, { onConflict: 'player_id,tech_id' })
+    await supabase.from('research_queue').delete().eq('id', r.id)
+    completed.push({ techId: r.tech_id, level: r.target_level })
+  }
+
+  return new Response(JSON.stringify({ success: true, completed }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// ============================================================
+// Mission handlers (v2)
+// ============================================================
+
+// deno-lint-ignore no-explicit-any
+async function handleDispatchMission(supabase: any, userId: string, planetId: string, missionType: string, fleet: Record<string, number>, targetCoords: string, devMode: boolean, cors: Record<string, string>) {
+  const { data: planet } = await supabase.from('planets').select('id, player_id, coordinates').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
 
   const mc = MISSION_CONFIGS[missionType]
-  if (!mc) {
-    return new Response(JSON.stringify({ error: 'Unknown mission type' }), {
-      status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
+  if (!mc) return new Response(JSON.stringify({ error: 'Unknown mission type' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Target must be a revealed galaxy_map entry
+  const { data: mapEntry } = await supabase.from('galaxy_map').select('*').eq('player_id', userId).eq('coordinates', targetCoords).single()
+  if (!mapEntry) return new Response(JSON.stringify({ error: 'Target not in galaxy map — send a probe first' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  if (mapEntry.visibility !== 'revealed') return new Response(JSON.stringify({ error: 'Target not yet revealed — send a probe first' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
 
   const hasRequired = mc.requiredShips.some((t: string) => (fleet[t] ?? 0) > 0)
-  if (!hasRequired) {
-    return new Response(JSON.stringify({ error: `Requires at least one: ${mc.requiredShips.join(', ')}` }), {
-      status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
-    })
-  }
+  if (!hasRequired) return new Response(JSON.stringify({ error: `Requires at least one: ${mc.requiredShips.join(', ')}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
 
   const { data: shipRows } = await supabase.from('planet_ships').select('ship_type, count').eq('planet_id', planetId)
   // deno-lint-ignore no-explicit-any
@@ -813,11 +716,7 @@ async function handleDispatchMission(supabase: any, userId: string, planetId: st
   for (const [type, count] of Object.entries(fleet)) {
     if (count <= 0) continue
     const avail = shipCounts.get(type) ?? 0
-    if (avail < count) {
-      return new Response(JSON.stringify({ error: `Not enough ${type} (have ${avail}, need ${count})` }), {
-        status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
-      })
-    }
+    if (avail < count) return new Response(JSON.stringify({ error: `Not enough ${type} (have ${avail}, need ${count})` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
   }
 
   const distance = coordDistance(planet.coordinates, targetCoords)
@@ -829,11 +728,7 @@ async function handleDispatchMission(supabase: any, userId: string, planetId: st
   const arrivesAt = new Date(now.getTime() + (devMode ? 3000 : travelSec * 1000))
   const returnsAt = new Date(now.getTime() + totalSec * 1000)
 
-  let targetName = targetCoords
-  const { data: sector } = await supabase.from('nearby_sectors').select('name').eq('planet_id', planetId).eq('coordinates', targetCoords).single()
-  if (sector) targetName = sector.name
-  const { data: loc } = await supabase.from('known_locations').select('name').eq('planet_id', planetId).eq('coordinates', targetCoords).single()
-  if (loc) targetName = loc.name
+  const targetName = mapEntry.name ?? targetCoords
 
   for (const [type, count] of Object.entries(fleet)) {
     if (count <= 0) continue
@@ -841,41 +736,20 @@ async function handleDispatchMission(supabase: any, userId: string, planetId: st
     await supabase.from('planet_ships').update({ count: cur - count, updated_at: now.toISOString() }).eq('planet_id', planetId).eq('ship_type', type)
   }
 
-  await supabase.from('missions').insert({
-    planet_id: planetId, mission_type: missionType, status: 'traveling',
-    target_coords: targetCoords, target_name: targetName, fleet,
-    dispatched_at: now.toISOString(), arrives_at: arrivesAt.toISOString(), returns_at: returnsAt.toISOString(),
-  })
+  await supabase.from('missions').insert({ planet_id: planetId, mission_type: missionType, status: 'traveling', target_coords: targetCoords, target_name: targetName, fleet, dispatched_at: now.toISOString(), arrives_at: arrivesAt.toISOString(), returns_at: returnsAt.toISOString() })
+  await supabase.from('planet_events').insert({ planet_id: planetId, event_type: 'mission_dispatched', message: `Fleet dispatched on ${missionType} to ${targetName}`, metadata: { mission_type: missionType, fleet, target: targetCoords } })
 
-  await supabase.from('planet_events').insert({
-    planet_id: planetId, event_type: 'mission_dispatched',
-    message: `Fleet dispatched on ${missionType} to ${targetName}`,
-    metadata: { mission_type: missionType, fleet, target: targetCoords },
-  })
-
-  return new Response(JSON.stringify({ success: true, returnsAt: returnsAt.toISOString() }), {
-    headers: { ...cors, 'Content-Type': 'application/json' },
-  })
+  return new Response(JSON.stringify({ success: true, returnsAt: returnsAt.toISOString() }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }
 
 // deno-lint-ignore no-explicit-any
 async function handleResolveMission(supabase: any, userId: string, planetId: string, missionId: string, cors: Record<string, string>) {
-  const { data: planet } = await supabase
-    .from('planets').select('id, player_id, coordinates, metal_amount, gas_amount').eq('id', planetId).eq('player_id', userId).single()
-
-  if (!planet) {
-    return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
-  }
+  const { data: planet } = await supabase.from('planets').select('id, player_id, metal_amount, gas_amount').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
 
   const { data: mission } = await supabase.from('missions').select('*').eq('id', missionId).eq('planet_id', planetId).single()
-
-  if (!mission || mission.status === 'completed') {
-    return new Response(JSON.stringify({ error: 'Mission not found or already completed' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
-  }
-
-  if (new Date(mission.returns_at) > new Date()) {
-    return new Response(JSON.stringify({ error: 'Mission not yet returned' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
-  }
+  if (!mission || mission.status === 'completed') return new Response(JSON.stringify({ error: 'Mission not found or already completed' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+  if (new Date(mission.returns_at) > new Date()) return new Response(JSON.stringify({ error: 'Mission not yet returned' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
 
   const fleet: Record<string, number> = mission.fleet
   // deno-lint-ignore no-explicit-any
@@ -883,110 +757,64 @@ async function handleResolveMission(supabase: any, userId: string, planetId: str
   let survivingFleet: Record<string, number> = { ...fleet }
   const now = new Date()
 
+  // Get galaxy_map entry for target
+  const { data: mapEntry } = await supabase.from('galaxy_map').select('*').eq('player_id', userId).eq('coordinates', mission.target_coords).single()
+  // deno-lint-ignore no-explicit-any
+  const metadata: Record<string, any> = mapEntry?.metadata ?? {}
+
   if (mission.mission_type === 'mining') {
     const totalYield = fleetTotalStat(fleet, 'miningYield')
     const totalCargo = fleetTotalStat(fleet, 'cargo')
-
-    const { data: sector } = await supabase.from('nearby_sectors').select('danger_level, richness').eq('planet_id', planetId).eq('coordinates', mission.target_coords).single()
-    const dangerLevel = sector?.danger_level ?? 0
-    const richness = sector?.richness ?? 1
-
-    if (Math.random() < dangerLevel * 0.1) {
-      const enemySize = dangerLevel <= 2 ? 'small' : dangerLevel <= 4 ? 'medium' : 'large'
-      const combat = resolveCombat(fleet, BANDIT_FLEETS_MISSION[enemySize].ships)
-      result.combat_log = combat.rounds
-      result.ships_lost = combat.attackerLosses
-      result.encounter_type = 'ambush'
-      survivingFleet = { ...fleet }
-      for (const [t, l] of Object.entries(combat.attackerLosses)) survivingFleet[t] = Math.max(0, (survivingFleet[t] ?? 0) - l)
-      const base = totalYield * richness * 2
-      const mult = combat.victory ? 1.0 : 0.3
-      result.rewards = { metal: Math.min(Math.floor(base * mult), totalCargo), gas: Math.floor(base * 0.4 * mult) }
-    } else {
-      const base = totalYield * richness * 2
-      result.rewards = { metal: Math.min(Math.floor(base), totalCargo), gas: Math.floor(base * 0.4) }
+    const richness = metadata.richness ?? 1
+    const base = totalYield * richness * 2
+    result.rewards = {
+      metal: Math.min(Math.floor(base), totalCargo),
+      gas: Math.floor(base * 0.4),
     }
-
-  } else if (mission.mission_type === 'scout_patrol') {
-    result = { encounter_type: 'patrol', rewards: { metal: Math.floor(Math.random() * 50 + 10), gas: Math.floor(Math.random() * 20 + 5) } }
-
-    if (Math.random() < 0.5) {
-      const hc = parseCoord(planet.coordinates)
-      const off = Math.floor(Math.random() * 30) + 10
-      const d = Math.random() > 0.5 ? 1 : -1
-      const nc = `${hc.galaxy}:${Math.max(1, hc.system + off * d)}:${Math.floor(Math.random() * 15) + 1}`
-      const ln = `Bandit Camp ${String.fromCharCode(65 + Math.floor(Math.random() * 26))}-${Math.floor(Math.random() * 99) + 1}`
-      const sz = Math.random() < 0.4 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large'
-      await supabase.from('known_locations').upsert({ planet_id: planetId, coordinates: nc, name: ln, location_type: 'bandit_camp', metadata: { size: sz, discovered_by: 'scout_patrol' } }, { onConflict: 'planet_id,coordinates' })
-      result.discovered = { coordinates: nc, name: ln, type: 'bandit_camp' }
-    }
-
-    if (Math.random() < 0.2) {
-      const combat = resolveCombat(fleet, BANDIT_FLEETS_MISSION.small.ships)
-      result.combat_log = combat.rounds
-      result.ships_lost = combat.attackerLosses
-      result.encounter_type = 'skirmish'
-      survivingFleet = { ...fleet }
-      for (const [t, l] of Object.entries(combat.attackerLosses)) survivingFleet[t] = Math.max(0, (survivingFleet[t] ?? 0) - l)
-    }
-
-  } else if (mission.mission_type === 'expedition') {
-    const encounter = weightedRandom(EXPEDITION_WEIGHTS)
-    result.encounter_type = encounter
-    const hc = parseCoord(planet.coordinates)
-
-    if (encounter === 'mining_site') {
-      const cargo = fleetTotalStat(fleet, 'cargo')
-      result.rewards = { metal: Math.floor(cargo * 0.6), gas: Math.floor(cargo * 0.3) }
-      const off = Math.floor(Math.random() * 40) + 15
-      const d = Math.random() > 0.5 ? 1 : -1
-      const nc = `${hc.galaxy}:${Math.max(1, hc.system + off * d)}:${Math.floor(Math.random() * 15) + 1}`
-      const ln = `Rich ${['Asteroid', 'Mineral', 'Crystal'][Math.floor(Math.random() * 3)]} Field`
-      await supabase.from('known_locations').upsert({ planet_id: planetId, coordinates: nc, name: ln, location_type: 'asteroid_field', metadata: { richness: Math.floor(Math.random() * 3) + 3, discovered_by: 'expedition' } }, { onConflict: 'planet_id,coordinates' })
-      result.discovered = { coordinates: nc, name: ln, type: 'asteroid_field' }
-
-    } else if (encounter === 'bandits') {
-      const sz = Math.random() < 0.5 ? 'small' : 'medium'
-      const combat = resolveCombat(fleet, BANDIT_FLEETS_MISSION[sz].ships)
-      result.combat_log = combat.rounds; result.ships_lost = combat.attackerLosses
-      survivingFleet = { ...fleet }
-      for (const [t, l] of Object.entries(combat.attackerLosses)) survivingFleet[t] = Math.max(0, (survivingFleet[t] ?? 0) - l)
-      result.rewards = combat.victory ? { metal: Math.floor(Math.random() * 500 + 200), gas: Math.floor(Math.random() * 300 + 100) } : { metal: 0, gas: 0 }
-      if (combat.victory) {
-        const off = Math.floor(Math.random() * 30) + 10
-        const d = Math.random() > 0.5 ? 1 : -1
-        const nc = `${hc.galaxy}:${Math.max(1, hc.system + off * d)}:${Math.floor(Math.random() * 15) + 1}`
-        const ln = `Bandit Outpost ${String.fromCharCode(65 + Math.floor(Math.random() * 26))}-${Math.floor(Math.random() * 99) + 1}`
-        await supabase.from('known_locations').upsert({ planet_id: planetId, coordinates: nc, name: ln, location_type: 'bandit_camp', metadata: { size: sz, discovered_by: 'expedition' } }, { onConflict: 'planet_id,coordinates' })
-        result.discovered = { coordinates: nc, name: ln, type: 'bandit_camp' }
-      }
-
-    } else if (encounter === 'asteroid') {
-      const combat = resolveCombat(fleet, { asteroid: { count: 1, hp: 80, attack: 0, defense: 15 } })
-      result.combat_log = combat.rounds; result.ships_lost = combat.attackerLosses
-      survivingFleet = { ...fleet }
-      for (const [t, l] of Object.entries(combat.attackerLosses)) survivingFleet[t] = Math.max(0, (survivingFleet[t] ?? 0) - l)
-      result.rewards = combat.victory ? { metal: Math.floor(Math.random() * 800 + 400), gas: Math.floor(Math.random() * 400 + 200) } : { metal: 0, gas: 0 }
-
-    } else {
-      result.rewards = { metal: Math.floor(Math.random() * 80 + 20), gas: Math.floor(Math.random() * 30 + 10) }
-    }
+    result.encounter_type = 'mining'
 
   } else if (mission.mission_type === 'raid') {
-    const { data: location } = await supabase.from('known_locations').select('*').eq('planet_id', planetId).eq('coordinates', mission.target_coords).single()
-    const size = (location?.metadata as Record<string, unknown>)?.size as string ?? 'small'
-    const combat = resolveCombat(fleet, (BANDIT_FLEETS_MISSION[size] ?? BANDIT_FLEETS_MISSION.small).ships)
-    result.combat_log = combat.rounds; result.ships_lost = combat.attackerLosses; result.encounter_type = 'raid'
+    const size = (metadata.size as string) ?? 'small'
+    const combat = resolveCombat(fleet, (BANDIT_FLEETS[size] ?? BANDIT_FLEETS.small).ships)
+    result.combat_log = combat.rounds
+    result.ships_lost = combat.attackerLosses
+    result.encounter_type = 'raid'
     survivingFleet = { ...fleet }
-    for (const [t, l] of Object.entries(combat.attackerLosses)) survivingFleet[t] = Math.max(0, (survivingFleet[t] ?? 0) - l)
+    for (const [t, l] of Object.entries(combat.attackerLosses)) {
+      survivingFleet[t] = Math.max(0, (survivingFleet[t] ?? 0) - l)
+    }
 
     if (combat.victory) {
       const mult = size === 'large' ? 5 : size === 'medium' ? 3 : 1
-      result.rewards = { metal: Math.floor((Math.random() * 500 + 300) * mult), gas: Math.floor((Math.random() * 300 + 150) * mult) }
-      if (location) await supabase.from('known_locations').delete().eq('id', location.id)
+      result.rewards = {
+        metal: Math.floor((Math.random() * 500 + 300) * mult),
+        gas: Math.floor((Math.random() * 300 + 150) * mult),
+      }
+      // Mark location cleared, schedule respawn in 2–6 hours
+      const respawnHours = 2 + Math.random() * 4
+      if (mapEntry) {
+        await supabase.from('galaxy_map').update({
+          cleared_at: now.toISOString(),
+          respawns_at: new Date(now.getTime() + respawnHours * 3600 * 1000).toISOString(),
+          metadata: { ...metadata, size, respawn_size: size },
+        }).eq('id', mapEntry.id)
+      }
     } else {
       survivingFleet = Object.fromEntries(Object.keys(fleet).map(k => [k, 0]))
       result.rewards = { metal: 0, gas: 0 }
+    }
+
+  } else if (mission.mission_type === 'salvage') {
+    const totalCargo = fleetTotalStat(fleet, 'cargo')
+    const salvageMetal = metadata.salvage_metal ?? Math.floor(Math.random() * 400 + 100)
+    result.rewards = {
+      metal: Math.min(salvageMetal, totalCargo),
+      gas: Math.floor(salvageMetal * 0.2),
+    }
+    result.encounter_type = 'salvage'
+    // After salvage, mark as cleared
+    if (mapEntry) {
+      await supabase.from('galaxy_map').update({ cleared_at: now.toISOString(), respawns_at: null }).eq('id', mapEntry.id)
     }
   }
 
@@ -1003,22 +831,18 @@ async function handleResolveMission(supabase: any, userId: string, planetId: str
   // Add resources
   const rewards = result.rewards ?? { metal: 0, gas: 0 }
   if ((rewards.metal ?? 0) > 0 || (rewards.gas ?? 0) > 0) {
-    await supabase.from('planets').update({
-      metal_amount: planet.metal_amount + (rewards.metal ?? 0),
-      gas_amount: planet.gas_amount + (rewards.gas ?? 0),
-    }).eq('id', planetId)
+    await supabase.from('planets').update({ metal_amount: planet.metal_amount + (rewards.metal ?? 0), gas_amount: planet.gas_amount + (rewards.gas ?? 0) }).eq('id', planetId)
   }
 
   await supabase.from('missions').update({ status: 'completed', result }).eq('id', missionId)
 
   const shipsLost = result.ships_lost ? Object.values(result.ships_lost as Record<string, number>).reduce((a: number, b: number) => a + b, 0) : 0
   await supabase.from('planet_events').insert({
-    planet_id: planetId, event_type: 'mission_completed',
+    planet_id: planetId,
+    event_type: 'mission_completed',
     message: `${mission.mission_type} returned. +${rewards.metal ?? 0} metal, +${rewards.gas ?? 0} gas${shipsLost > 0 ? `. ${shipsLost} ships lost.` : ''}`,
-    metadata: { mission_type: mission.mission_type, result },
+    metadata: { mission_type: mission.mission_type, result, mission_id: missionId },
   })
 
-  return new Response(JSON.stringify({ success: true, result }), {
-    headers: { ...cors, 'Content-Type': 'application/json' },
-  })
+  return new Response(JSON.stringify({ success: true, result }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }
