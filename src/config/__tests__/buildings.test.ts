@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { BUILDINGS, getBuildingConfig } from '../buildings'
 
 describe('BUILDINGS config', () => {
-  it('has 9 buildings', () => {
-    expect(BUILDINGS).toHaveLength(9)
+  it('has 10 buildings', () => {
+    expect(BUILDINGS).toHaveLength(10)
   })
 
   it('each building has required fields', () => {
@@ -17,6 +17,11 @@ describe('BUILDINGS config', () => {
       expect(b.baseBuildTimeSeconds).toBeGreaterThan(0)
       expect(b.category).toMatch(/^(resource|storage|infrastructure)$/)
     }
+  })
+
+  it('all buildings have unique ids', () => {
+    const ids = BUILDINGS.map((b) => b.id)
+    expect(new Set(ids).size).toBe(ids.length)
   })
 
   it('headquarters has no prerequisites', () => {
@@ -36,5 +41,15 @@ describe('BUILDINGS config', () => {
     expect(lab.prerequisites).toEqual([
       { buildingId: 'headquarters', level: 3 },
     ])
+  })
+
+  it('contains radar_array', () => {
+    expect(() => getBuildingConfig('radar_array')).not.toThrow()
+  })
+
+  it('radar_array is in infrastructure category and requires headquarters level 3', () => {
+    const radar = getBuildingConfig('radar_array')
+    expect(radar.category).toBe('infrastructure')
+    expect(radar.prerequisites).toContainEqual({ buildingId: 'headquarters', level: 3 })
   })
 })

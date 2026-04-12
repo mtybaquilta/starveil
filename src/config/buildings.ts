@@ -132,6 +132,19 @@ export const BUILDINGS: BuildingConfig[] = [
     prerequisites: [{ buildingId: 'headquarters', level: 2 }],
     image: '/images/buildings/shipyard.png',
   },
+  {
+    id: 'radar_array',
+    name: 'Radar Array',
+    description: 'Scans the surrounding sector for anomalies and objects. Each level increases the detection range and the number of coordinates detected per scan cycle.',
+    category: 'infrastructure',
+    maxLevel: 20,
+    baseCost: { metal: 300, gas: 200 },
+    baseProductionPerHour: 0,
+    baseEnergyConsumption: 18,
+    baseBuildTimeSeconds: 90,
+    prerequisites: [{ buildingId: 'headquarters', level: 3 }],
+    image: '/images/buildings/radar_array.png',
+  },
 ]
 
 const BUILDING_MAP = new Map(BUILDINGS.map((b) => [b.id, b]))
