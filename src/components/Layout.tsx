@@ -66,6 +66,7 @@ export function Layout() {
         planetName={planet.name}
         coordinates={planet.coordinates}
         weatherType={weather?.weather_type ?? 'calm_skies'}
+        weatherExpiresAt={weather?.expires_at ?? null}
       />
       <div className="flex flex-1">
         <Sidebar

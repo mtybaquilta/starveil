@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { getWeatherForecast, ForecastDetail } from '../lib/weather'
 import type { PlanetWeather, PlanetBuilding } from '../hooks/usePlanet'
 
@@ -6,8 +7,34 @@ type Props = {
   buildings: PlanetBuilding[]
 }
 
+function formatWeatherTime(ms: number): string {
+  if (ms <= 0) return '0s'
+  const totalSeconds = Math.ceil(ms / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
+}
+
 export function WeatherDisplay({ weather, buildings }: Props) {
   const stationLevel = buildings.find((b) => b.building_id === 'weather_station')?.level ?? 0
+  const [remaining, setRemaining] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!weather?.expires_at) {
+      setRemaining(null)
+      return
+    }
+    const update = () => {
+      const r = new Date(weather.expires_at!).getTime() - Date.now()
+      setRemaining(r > 0 ? r : 0)
+    }
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [weather?.expires_at])
 
   if (!weather) {
     return (
@@ -44,6 +71,9 @@ export function WeatherDisplay({ weather, buildings }: Props) {
       <div>
         <div className="text-xs font-medium text-slate-200">
           {weather.weather_type === 'calm_skies' ? 'Calm Skies' : forecast.message}
+          {remaining !== null && remaining > 0 && (
+            <span className="text-slate-500 font-normal ml-1.5">· {formatWeatherTime(remaining)}</span>
+          )}
         </div>
         {stationLevel === 0 && (
           <div className="text-[10px] text-slate-500">Build a Weather Station for forecasts</div>
