@@ -379,8 +379,61 @@ function HomePlanet({ name, coords }: { name: string; coords: string }) {
   )
 }
 
+function MissionDot({
+  mission,
+  homeCoords,
+}: {
+  mission: { id: string; mission_type: string; target_coords: string; dispatched_at: string; returns_at: string }
+  homeCoords: string
+}) {
+  const dispatched = new Date(mission.dispatched_at).getTime()
+  const returns = new Date(mission.returns_at).getTime()
+  const now = Date.now()
+  const total = returns - dispatched
+  const progress = Math.min(1, Math.max(0, (now - dispatched) / total))
+
+  const targetPos = coordsToPosition(mission.target_coords, homeCoords)
+
+  let x: number, y: number
+  if (progress <= 0.5) {
+    const t = progress * 2
+    x = HOME_X + (targetPos.x - HOME_X) * t
+    y = HOME_Y + (targetPos.y - HOME_Y) * t
+  } else {
+    const t = (progress - 0.5) * 2
+    x = targetPos.x + (HOME_X - targetPos.x) * t
+    y = targetPos.y + (HOME_Y - targetPos.y) * t
+  }
+
+  const color = mission.mission_type === 'mining' ? '#f59e0b'
+    : mission.mission_type === 'raid' ? '#ef4444'
+    : '#22d3ee'
+
+  const glowColor = mission.mission_type === 'mining' ? 'rgba(245,158,11,0.4)'
+    : mission.mission_type === 'raid' ? 'rgba(239,68,68,0.4)'
+    : 'rgba(34,211,238,0.4)'
+
+  return (
+    <div
+      className="absolute z-[8] pointer-events-none transition-all duration-[5000ms] ease-linear"
+      style={{ left: x, top: y, transform: 'translate(-50%, -50%)' }}
+    >
+      {/* Outer pulse ring */}
+      <div
+        className="absolute inset-0 rounded-full animate-ping"
+        style={{ background: glowColor, width: 10, height: 10, margin: -2 }}
+      />
+      {/* Dot */}
+      <div
+        className="w-[6px] h-[6px] rounded-full"
+        style={{ background: color, boxShadow: `0 0 8px ${glowColor}` }}
+      />
+    </div>
+  )
+}
+
 export function GalaxyMapPage() {
-  const { planet, galaxyMap, buildings, refetch } = useOutletContext<GameContext>()
+  const { planet, galaxyMap, buildings, refetch, activeMissions } = useOutletContext<GameContext>()
   const navigate = useNavigate()
 
   const [camX, setCamX] = useState(0)
@@ -411,6 +464,13 @@ export function GalaxyMapPage() {
     const wh = wrapRef.current.clientHeight
     setCamX(HOME_X - ww / 2)
     setCamY(HOME_Y - wh / 2)
+  }, [])
+
+  // Tick every 5s to update mission dot positions
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 5000)
+    return () => clearInterval(id)
   }, [])
 
   const clamp = useCallback((x: number, y: number) => {
@@ -590,7 +650,7 @@ export function GalaxyMapPage() {
             }}
           />
 
-          {/* Connection lines */}
+          {/* Connection lines + mission route lines */}
           <svg className="absolute inset-0 pointer-events-none z-[1]" width={CANVAS_W} height={CANVAS_H}>
             {visibleLocations.map((entry) => {
               const pos = coordsToPosition(entry.coordinates, planet.coordinates)
@@ -605,10 +665,32 @@ export function GalaxyMapPage() {
                 />
               )
             })}
+            {activeMissions.map((mission) => {
+              const pos = coordsToPosition(mission.target_coords, planet.coordinates)
+              const color = mission.mission_type === 'mining' ? 'rgba(245,158,11,0.2)'
+                : mission.mission_type === 'raid' ? 'rgba(239,68,68,0.2)'
+                : 'rgba(34,211,238,0.2)'
+              return (
+                <line
+                  key={`route-${mission.id}`}
+                  x1={HOME_X} y1={HOME_Y} x2={pos.x} y2={pos.y}
+                  stroke={color} strokeWidth={1} strokeDasharray="4,4"
+                />
+              )
+            })}
           </svg>
 
           {/* Home planet */}
           <HomePlanet name={planet.name} coords={planet.coordinates} />
+
+          {/* Mission dots */}
+          {activeMissions.map((mission) => (
+            <MissionDot
+              key={mission.id}
+              mission={mission}
+              homeCoords={planet.coordinates}
+            />
+          ))}
 
           {/* Location nodes */}
           {visibleLocations.map((entry) => (
