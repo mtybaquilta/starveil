@@ -136,6 +136,159 @@ function LocationNode({
   )
 }
 
+function DetailPanel({
+  entry,
+  sending,
+  onSendProbe,
+  onNavigateMission,
+  onDeselect,
+}: {
+  entry: GalaxyMapEntry
+  sending: boolean
+  onSendProbe: (coords: string) => void
+  onNavigateMission: (coords: string, type: string) => void
+  onDeselect: () => void
+}) {
+  const isDetected = entry.visibility === 'detected'
+  const type = entry.location_type
+  const meta = entry.metadata as Record<string, unknown>
+
+  const typeLabel = type === 'asteroid_field' ? 'Asteroid Field'
+    : type === 'bandit_camp' ? 'Bandit Camp'
+    : type === 'debris_field' ? 'Debris Field'
+    : 'Unknown'
+
+  const titleColor = isDetected ? 'text-yellow-500/80'
+    : type === 'asteroid_field' ? 'text-amber-400'
+    : type === 'bandit_camp' ? 'text-red-400'
+    : type === 'debris_field' ? 'text-slate-300'
+    : 'text-slate-400'
+
+  const badgeBg = isDetected ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-600'
+    : type === 'asteroid_field' ? 'bg-amber-500/10 border-amber-500/20 text-amber-600'
+    : type === 'bandit_camp' ? 'bg-red-500/10 border-red-500/20 text-red-600'
+    : type === 'debris_field' ? 'bg-slate-400/10 border-slate-400/15 text-slate-500'
+    : 'bg-slate-600/10 border-slate-600/20 text-slate-500'
+
+  const description = isDetected
+    ? 'A faint signal detected at these coordinates. Send a probe to reveal what lies here.'
+    : type === 'asteroid_field'
+      ? 'A cluster of mineral-rich asteroids. Send a mining fleet to extract resources.'
+      : type === 'bandit_camp'
+        ? `A ${(meta?.size as string) ?? 'unknown'} bandit encampment. Raid it for resources, but expect armed resistance.`
+        : type === 'debris_field'
+          ? 'Wreckage from a past battle. Deploy cargo ships to salvage valuable materials.'
+          : ''
+
+  const size = (meta?.size as string) ?? 'medium'
+  const threat = size === 'small' ? 'Low' : size === 'medium' ? 'Medium' : 'High'
+
+  return (
+    <div
+      data-clickable
+      className="absolute bottom-0 left-0 right-0 z-[15] border-t border-slate-700/15 px-5 py-4 backdrop-blur-xl transition-transform duration-[250ms] ease-out"
+      style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.95), rgba(8,12,20,0.98))' }}
+    >
+      <div className="flex gap-6 items-start">
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`text-[15px] font-bold ${titleColor}`}>
+              {isDetected ? 'Unknown Signal' : entry.name ?? typeLabel}
+            </span>
+            <span className={`text-[9px] px-2 py-0.5 rounded border font-medium ${badgeBg}`}>
+              {isDetected ? 'Detected' : typeLabel}
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">{description}</p>
+          <div className="flex gap-5 mt-2.5">
+            {!isDetected && type === 'asteroid_field' && (
+              <div>
+                <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Richness</div>
+                <div className="text-[13px] font-semibold text-amber-400">{(meta?.richness as number) ?? '?'} / 5</div>
+              </div>
+            )}
+            {!isDetected && type === 'bandit_camp' && (
+              <>
+                <div>
+                  <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Size</div>
+                  <div className="text-[13px] font-semibold text-red-400 capitalize">{size}</div>
+                </div>
+                <div>
+                  <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Threat</div>
+                  <div className="text-[13px] font-semibold text-red-300">{threat}</div>
+                </div>
+              </>
+            )}
+            {!isDetected && type === 'debris_field' && (
+              <div>
+                <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Est. Salvage</div>
+                <div className="text-[13px] font-semibold text-slate-300">~{(meta?.salvage_metal as number) ?? '?'} metal</div>
+              </div>
+            )}
+            <div>
+              <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Coordinates</div>
+              <div className="text-[12px] font-medium text-slate-300 font-mono">{entry.coordinates}</div>
+            </div>
+            {!isDetected && (
+              <div>
+                <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Status</div>
+                <div className="text-[12px] font-semibold text-green-400">Active</div>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* Actions */}
+        <div className="flex flex-col gap-1.5 shrink-0 w-[170px]">
+          {isDetected && (
+            <button
+              onClick={() => onSendProbe(entry.coordinates)}
+              disabled={sending}
+              className="w-full py-2 text-[11px] font-semibold rounded-lg text-yellow-300 border border-yellow-500/30 disabled:opacity-40 transition-colors"
+              style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.35), rgba(180,130,6,0.45))' }}
+            >
+              {sending ? 'Sending...' : 'Send Probe'}
+            </button>
+          )}
+          {!isDetected && type === 'asteroid_field' && (
+            <button
+              onClick={() => onNavigateMission(entry.coordinates, 'mining')}
+              className="w-full py-2 text-[11px] font-semibold rounded-lg text-white transition-colors"
+              style={{ background: 'linear-gradient(135deg, #d97706, #b45309)', boxShadow: '0 2px 8px rgba(217,119,6,0.25)' }}
+            >
+              Send Mining Fleet
+            </button>
+          )}
+          {!isDetected && type === 'bandit_camp' && (
+            <button
+              onClick={() => onNavigateMission(entry.coordinates, 'raid')}
+              className="w-full py-2 text-[11px] font-semibold rounded-lg text-white transition-colors"
+              style={{ background: 'linear-gradient(135deg, #dc2626, #991b1b)', boxShadow: '0 2px 8px rgba(220,38,38,0.25)' }}
+            >
+              Send Raid Fleet
+            </button>
+          )}
+          {!isDetected && type === 'debris_field' && (
+            <button
+              onClick={() => onNavigateMission(entry.coordinates, 'salvage')}
+              className="w-full py-2 text-[11px] font-semibold rounded-lg text-slate-100 transition-colors"
+              style={{ background: 'linear-gradient(135deg, #475569, #334155)' }}
+            >
+              Send Salvage Fleet
+            </button>
+          )}
+          <button
+            onClick={onDeselect}
+            className="w-full py-1.5 text-[10px] text-slate-500 hover:text-slate-300 bg-slate-700/30 border border-slate-600/12 rounded-lg transition-colors"
+          >
+            Deselect
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function HomePlanet({ name, coords }: { name: string; coords: string }) {
   return (
     <div
@@ -418,6 +571,19 @@ export function GalaxyMapPage() {
                 : 'Run a radar scan to discover nearby coordinates.'}
             </div>
           </div>
+        )}
+
+        {/* Minimap — placeholder for Task 5 */}
+
+        {/* Detail panel */}
+        {selected && (
+          <DetailPanel
+            entry={selected}
+            sending={sending}
+            onSendProbe={handleSendProbe}
+            onNavigateMission={(coords, type) => navigate(`/missions?target=${coords}&type=${type}`)}
+            onDeselect={() => setSelected(null)}
+          />
         )}
       </div>
     </div>
