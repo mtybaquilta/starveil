@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useOutletContext } from 'react-router-dom'
 import { MISSION_TYPES, getMissionConfig } from '../config/missions'
 import { SHIPS } from '../config/ships'
@@ -32,6 +32,19 @@ export function MissionsPage() {
   const [targetCoords, setTargetCoords] = useState('')
   const [dispatching, setDispatching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Pre-select from galaxy map navigation (?target=...&type=...)
+  useEffect(() => {
+    const paramType = searchParams.get('type')
+    const paramTarget = searchParams.get('target')
+    if (paramType && !selectedType) {
+      setSelectedType(paramType)
+      if (paramTarget) setTargetCoords(paramTarget)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, selectedType, setSearchParams])
 
   const fleetCounts = new Map(shipFleet.map((s) => [s.ship_type, s.count]))
 
