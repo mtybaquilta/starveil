@@ -37,6 +37,12 @@ export function OverviewPage() {
         <h1 className="text-lg font-bold text-slate-100">{planet.name}</h1>
         <p className="text-xs text-slate-500 mt-0.5">
           Temperate · Diameter: {planet.diameter.toLocaleString()} km · Slots: {usedSlots}/{planet.max_building_slots} used
+          {(() => {
+            const defenseRating = BUILDINGS
+              .filter((b) => b.defenseRating)
+              .reduce((sum, b) => sum + (b.defenseRating! * (buildingLevels.get(b.id) ?? 0)), 0)
+            return defenseRating > 0 ? <span className="ml-2 text-emerald-400">· Defense: {defenseRating}</span> : null
+          })()}
         </p>
       </div>
 

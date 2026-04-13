@@ -1,4 +1,4 @@
-export type BuildingCategory = 'resource' | 'storage' | 'infrastructure'
+export type BuildingCategory = 'resource' | 'storage' | 'infrastructure' | 'defense'
 
 export type BuildingConfig = {
   id: string
@@ -12,6 +12,7 @@ export type BuildingConfig = {
   baseBuildTimeSeconds: number
   prerequisites: { buildingId: string; level: number }[]
   image: string
+  defenseRating?: number
 }
 
 export const BUILDINGS: BuildingConfig[] = [
@@ -144,6 +145,91 @@ export const BUILDINGS: BuildingConfig[] = [
     baseBuildTimeSeconds: 90,
     prerequisites: [{ buildingId: 'headquarters', level: 3 }],
     image: '/images/buildings/radar_array.png',
+  },
+  // Defense structures
+  {
+    id: 'perimeter_turret',
+    name: 'Perimeter Turret',
+    description: 'Automated ballistic turrets forming the first line of planetary defense. Fast to build, cheap to maintain.',
+    category: 'defense',
+    maxLevel: 20,
+    baseCost: { metal: 150, gas: 50 },
+    baseProductionPerHour: 0,
+    baseEnergyConsumption: 8,
+    baseBuildTimeSeconds: 45,
+    prerequisites: [{ buildingId: 'headquarters', level: 2 }],
+    image: '/images/buildings/perimeter_turret.png',
+    defenseRating: 10,
+  },
+  {
+    id: 'ion_cannon',
+    name: 'Ion Cannon',
+    description: 'High-energy directed beam weapon. Devastating against capital ships but draws significant power.',
+    category: 'defense',
+    maxLevel: 20,
+    baseCost: { metal: 400, gas: 250 },
+    baseProductionPerHour: 0,
+    baseEnergyConsumption: 25,
+    baseBuildTimeSeconds: 120,
+    prerequisites: [{ buildingId: 'headquarters', level: 4 }, { buildingId: 'research_lab', level: 2 }],
+    image: '/images/buildings/ion_cannon.png',
+    defenseRating: 25,
+  },
+  {
+    id: 'missile_battery',
+    name: 'Missile Battery',
+    description: 'Guided warhead launchers with excellent range. A balanced mix of firepower and efficiency.',
+    category: 'defense',
+    maxLevel: 20,
+    baseCost: { metal: 250, gas: 150 },
+    baseProductionPerHour: 0,
+    baseEnergyConsumption: 15,
+    baseBuildTimeSeconds: 90,
+    prerequisites: [{ buildingId: 'headquarters', level: 3 }, { buildingId: 'perimeter_turret', level: 3 }],
+    image: '/images/buildings/missile_battery.png',
+    defenseRating: 18,
+  },
+  {
+    id: 'shield_generator',
+    name: 'Shield Generator',
+    description: 'Projects an energy barrier that absorbs incoming damage before structures take hits. The defensive cornerstone of any fortified colony.',
+    category: 'defense',
+    maxLevel: 20,
+    baseCost: { metal: 500, gas: 350 },
+    baseProductionPerHour: 0,
+    baseEnergyConsumption: 30,
+    baseBuildTimeSeconds: 150,
+    prerequisites: [{ buildingId: 'headquarters', level: 5 }, { buildingId: 'research_lab', level: 3 }],
+    image: '/images/buildings/shield_generator.png',
+    defenseRating: 30,
+  },
+  {
+    id: 'sensor_jammer',
+    name: 'Sensor Jammer',
+    description: 'Electronic warfare array that disrupts targeting systems, reducing attacker accuracy. Low power, high utility.',
+    category: 'defense',
+    maxLevel: 20,
+    baseCost: { metal: 200, gas: 200 },
+    baseProductionPerHour: 0,
+    baseEnergyConsumption: 10,
+    baseBuildTimeSeconds: 75,
+    prerequisites: [{ buildingId: 'headquarters', level: 4 }],
+    image: '/images/buildings/sensor_jammer.png',
+    defenseRating: 12,
+  },
+  {
+    id: 'orbital_platform',
+    name: 'Orbital Platform',
+    description: 'A weapons platform in low orbit. The ultimate planetary defense — expensive to build and maintain but unmatched in firepower.',
+    category: 'defense',
+    maxLevel: 20,
+    baseCost: { metal: 800, gas: 500 },
+    baseProductionPerHour: 0,
+    baseEnergyConsumption: 40,
+    baseBuildTimeSeconds: 200,
+    prerequisites: [{ buildingId: 'headquarters', level: 7 }, { buildingId: 'ion_cannon', level: 5 }],
+    image: '/images/buildings/orbital_platform.png',
+    defenseRating: 50,
   },
 ]
 

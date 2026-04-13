@@ -7,7 +7,7 @@ import { formatTime } from '../hooks/useConstructionQueue'
 import type { GameContext } from '../components/Layout'
 
 export function ShipyardPage() {
-  const { buildings, resources, activeShipBuild, startShipBuild, shipFleet, technologies } = useOutletContext<GameContext>()
+  const { buildings, resources, activeShipBuild, shipBuildQueue, startShipBuild, shipFleet, technologies } = useOutletContext<GameContext>()
 
   const buildingLevels = new Map(buildings.map((b) => [b.building_id, b.level]))
   const shipyardLevel = buildingLevels.get('shipyard') ?? 0
@@ -57,7 +57,7 @@ export function ShipyardPage() {
               ? `${ship.requiredTech.techId.replace(/_/g, ' ')} Lv.${ship.requiredTech.level}`
               : undefined
           const canAfford = resources.metal >= ship.cost.metal && resources.gas >= ship.cost.gas
-          const queueFull = activeShipBuild !== null
+          const queueFull = shipBuildQueue.length >= 5
           const canBuild = !isLocked && !queueFull && canAfford
           const buildTime = shipBuildTimeSeconds(ship.baseBuildTimeSeconds, shipyardLevel)
           const fleetCount = fleetCounts.get(ship.id) ?? 0
@@ -70,6 +70,7 @@ export function ShipyardPage() {
               lockReason={lockReason}
               canBuild={canBuild}
               queueFull={queueFull}
+              hasQueuedItems={shipBuildQueue.length > 0}
               canAfford={canAfford}
               buildTime={buildTime}
               fleetCount={fleetCount}
@@ -90,6 +91,7 @@ function ShipCard({
   lockReason,
   canBuild,
   queueFull,
+  hasQueuedItems,
   canAfford,
   buildTime,
   fleetCount,
@@ -102,6 +104,7 @@ function ShipCard({
   lockReason?: string
   canBuild: boolean
   queueFull: boolean
+  hasQueuedItems: boolean
   canAfford: boolean
   buildTime: number
   fleetCount: number
@@ -196,7 +199,7 @@ function ShipCard({
           disabled={!canBuild || building}
           className="w-full py-2.5 bg-sky-500 hover:bg-sky-400 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
         >
-          {building ? 'Building...' : queueFull ? 'Queue Full' : !canAfford ? 'Insufficient Resources' : 'Build →'}
+          {building ? 'Building...' : queueFull ? 'Queue Full (5)' : !canAfford ? 'Insufficient Resources' : hasQueuedItems ? 'Add to Queue →' : 'Build →'}
         </button>
       </div>
     </div>

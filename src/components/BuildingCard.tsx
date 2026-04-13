@@ -18,6 +18,12 @@ const BUILDING_ICONS: Record<string, string> = {
   gas_storage: '🛢️',
   weather_station: '🌤️',
   research_lab: '🔬',
+  perimeter_turret: '🔫',
+  ion_cannon: '⚡',
+  missile_battery: '🚀',
+  shield_generator: '🛡️',
+  sensor_jammer: '📡',
+  orbital_platform: '🛸',
 }
 
 const BASE_STORAGE = 10000
@@ -36,6 +42,8 @@ export function BuildingCard({ buildingId, level, isUnlocked, prerequisiteText }
     }
   } else if (config.category === 'storage' && level > 0) {
     statText = `${Math.floor(storageCapacity(BASE_STORAGE, level)).toLocaleString()} cap`
+  } else if (config.category === 'defense' && level > 0 && config.defenseRating) {
+    statText = `${config.defenseRating * level} defense`
   } else if (buildingId === 'headquarters' && level > 0) {
     statText = `${level + 8} slots`
   } else if (level > 0) {

@@ -24,6 +24,12 @@ const BUILDING_ICONS: Record<string, string> = {
   weather_station: '🌤️',
   research_lab: '🔬',
   shipyard: '🚀',
+  perimeter_turret: '🔫',
+  ion_cannon: '⚡',
+  missile_battery: '🚀',
+  shield_generator: '🛡️',
+  sensor_jammer: '📡',
+  orbital_platform: '🛸',
 }
 
 const ICON_GRADIENTS: Record<string, string> = {
@@ -36,6 +42,12 @@ const ICON_GRADIENTS: Record<string, string> = {
   weather_station: 'from-cyan-700 to-cyan-900',
   research_lab: 'from-pink-800 to-pink-950',
   shipyard: 'from-sky-700 to-sky-900',
+  perimeter_turret: 'from-red-800 to-red-950',
+  ion_cannon: 'from-yellow-700 to-yellow-900',
+  missile_battery: 'from-orange-800 to-orange-950',
+  shield_generator: 'from-emerald-700 to-emerald-900',
+  sensor_jammer: 'from-teal-700 to-teal-900',
+  orbital_platform: 'from-indigo-700 to-indigo-900',
 }
 
 const BASE_STORAGE = 10000
@@ -110,6 +122,14 @@ export function BuildingDetail({ buildingId, buildings, metal, gas, activeBuild,
             )}
             {config.category === 'storage' && level > 0 && (
               <StatBlock label="Capacity" value={Math.floor(storageCapacity(BASE_STORAGE, level)).toLocaleString()} color="text-slate-300" />
+            )}
+            {config.defenseRating && level > 0 && (
+              <>
+                <StatBlock label="Defense Rating" value={`${config.defenseRating * level}`} color="text-emerald-400" />
+                {!isMaxLevel && (
+                  <StatBlock label="Next Level" value={`${config.defenseRating * targetLevel}`} color="text-green-400" />
+                )}
+              </>
             )}
             {config.baseEnergyConsumption > 0 && (
               <StatBlock

@@ -24,7 +24,7 @@ export type ShipQueueItem = {
   ship_type: string
   quantity: number
   started_at: string
-  completes_at: string
+  completes_at: string | null
 }
 
 export type Mission = {
@@ -166,7 +166,8 @@ export function usePlanet() {
         supabase
           .from('ship_queue')
           .select('*')
-          .eq('planet_id', planetId),
+          .eq('planet_id', planetId)
+          .order('started_at', { ascending: true }),
         supabase
           .from('missions')
           .select('*')

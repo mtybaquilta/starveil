@@ -17,12 +17,9 @@ export function useShipQueue(
 
   useEffect(() => {
     if (completingRef.current) return
-    if (queue.length > 0) {
-      setActiveShipBuild(queue[0])
-    } else {
-      setActiveShipBuild(null)
-      setShipTimeRemaining(null)
-    }
+    const active = queue.find((item) => item.completes_at !== null) ?? null
+    setActiveShipBuild(active)
+    if (!active) setShipTimeRemaining(null)
   }, [queue])
 
   const completeShipBuild = useCallback(async () => {
@@ -43,10 +40,10 @@ export function useShipQueue(
   }, [planetId, activeShipBuild, onBuildComplete])
 
   useEffect(() => {
-    if (!activeShipBuild) return
+    if (!activeShipBuild?.completes_at) return
 
     const interval = setInterval(() => {
-      const remaining = new Date(activeShipBuild.completes_at).getTime() - Date.now()
+      const remaining = new Date(activeShipBuild.completes_at!).getTime() - Date.now()
       if (remaining <= 0) {
         setShipTimeRemaining(0)
         clearInterval(interval)
@@ -78,6 +75,7 @@ export function useShipQueue(
   return {
     activeShipBuild,
     shipTimeRemaining,
+    shipQueue: queue,
     startShipBuild,
   }
 }

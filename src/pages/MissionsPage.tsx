@@ -35,13 +35,19 @@ export function MissionsPage() {
 
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Pre-select from galaxy map navigation (?target=...&type=...)
+  // Pre-select from galaxy map navigation (?target=...&type=...) or fleet deploy (?ship=...)
   useEffect(() => {
     const paramType = searchParams.get('type')
     const paramTarget = searchParams.get('target')
+    const paramShip = searchParams.get('ship')
     if (paramType && !selectedType) {
       setSelectedType(paramType)
       if (paramTarget) setTargetCoords(paramTarget)
+    }
+    if (paramShip) {
+      setFleet((f) => ({ ...f, [paramShip]: (f[paramShip] ?? 0) + 1 }))
+    }
+    if (paramType || paramShip) {
       setSearchParams({}, { replace: true })
     }
   }, [searchParams, selectedType, setSearchParams])
