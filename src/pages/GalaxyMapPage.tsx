@@ -8,17 +8,9 @@ const CANVAS_W = 2400
 const CANVAS_H = 1600
 const HOME_X = CANVAS_W / 2
 const HOME_Y = CANVAS_H / 2
-const SYSTEM_WIDTH = 400
+const SYSTEM_COL_W = 200   // px per system number (horizontal)
+const POSITION_ROW_H = 80  // px per position number (vertical)
 const CONNECTION_RADIUS = 400
-
-/** Simple seeded hash for deterministic jitter from entry ID */
-function hashId(id: string): number {
-  let h = 0
-  for (let i = 0; i < id.length; i++) {
-    h = ((h << 5) - h + id.charCodeAt(i)) | 0
-  }
-  return Math.abs(h)
-}
 
 function parseCoords(coords: string): { galaxy: number; system: number; position: number } {
   const [g, s, p] = coords.split(':').map(Number)
@@ -28,20 +20,12 @@ function parseCoords(coords: string): { galaxy: number; system: number; position
 function coordsToPosition(
   coords: string,
   homeCoords: string,
-  entryId: string
 ): { x: number; y: number } {
   const loc = parseCoords(coords)
   const home = parseCoords(homeCoords)
 
-  const systemDelta = loc.system - home.system
-  const positionDelta = loc.position - home.position
-
-  const hash = hashId(entryId)
-  const jitterX = ((hash % 100) - 50) * 1.5
-  const jitterY = (((hash >> 8) % 100) - 50) * 1.5
-
-  const x = HOME_X + systemDelta * SYSTEM_WIDTH + positionDelta * 40 + jitterX
-  const y = HOME_Y + positionDelta * 100 + systemDelta * 30 + jitterY
+  const x = HOME_X + (loc.system - home.system) * SYSTEM_COL_W
+  const y = HOME_Y + (loc.position - home.position) * POSITION_ROW_H
 
   return {
     x: Math.max(40, Math.min(CANVAS_W - 80, x)),
@@ -89,7 +73,7 @@ function LocationNode({
   isSelected: boolean
   onSelect: () => void
 }) {
-  const pos = coordsToPosition(entry.coordinates, homeCoords, entry.id)
+  const pos = coordsToPosition(\1, \2)
   const isDetected = entry.visibility === 'detected'
   const type = entry.location_type
 
@@ -176,7 +160,7 @@ function Minimap({
     >
       {/* Location dots */}
       {locations.map((entry) => {
-        const pos = coordsToPosition(entry.coordinates, homeCoords, entry.id)
+        const pos = coordsToPosition(\1, \2)
         return (
           <div
             key={`mm-${entry.id}`}
@@ -504,7 +488,7 @@ export function GalaxyMapPage() {
     if (!target) return
     const entry = visibleLocations.find((loc) => loc.coordinates === target)
     if (entry) {
-      const pos = coordsToPosition(entry.coordinates, planet.coordinates, entry.id)
+      const pos = coordsToPosition(\1, \2)
       const w = wrapRef.current?.clientWidth ?? 800
       const h = wrapRef.current?.clientHeight ?? 600
       const clamped = clamp(pos.x - w / 2, pos.y - h / 2)
@@ -607,7 +591,7 @@ export function GalaxyMapPage() {
           {/* Connection lines */}
           <svg className="absolute inset-0 pointer-events-none z-[1]" width={CANVAS_W} height={CANVAS_H}>
             {visibleLocations.map((entry) => {
-              const pos = coordsToPosition(entry.coordinates, planet.coordinates, entry.id)
+              const pos = coordsToPosition(\1, \2)
               const dx = pos.x - HOME_X
               const dy = pos.y - HOME_Y
               if (Math.sqrt(dx * dx + dy * dy) > CONNECTION_RADIUS) return null
