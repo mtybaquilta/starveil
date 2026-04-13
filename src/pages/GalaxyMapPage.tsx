@@ -136,6 +136,80 @@ function LocationNode({
   )
 }
 
+function Minimap({
+  locations,
+  homeCoords,
+  camX,
+  camY,
+  viewportW,
+  viewportH,
+  onScrollHome,
+}: {
+  locations: GalaxyMapEntry[]
+  homeCoords: string
+  camX: number
+  camY: number
+  viewportW: number
+  viewportH: number
+  onScrollHome: () => void
+}) {
+  const vpW = (viewportW / CANVAS_W) * 100
+  const vpH = (viewportH / CANVAS_H) * 100
+  const vpX = (camX / CANVAS_W) * 100
+  const vpY = (camY / CANVAS_H) * 100
+
+  const dotColor = (entry: GalaxyMapEntry) => {
+    if (entry.visibility === 'detected') return 'bg-yellow-500/40'
+    switch (entry.location_type) {
+      case 'asteroid_field': return 'bg-amber-400'
+      case 'bandit_camp': return 'bg-red-500'
+      case 'debris_field': return 'bg-slate-500'
+      default: return 'bg-slate-600'
+    }
+  }
+
+  return (
+    <div
+      data-clickable
+      className="absolute bottom-3 right-3 w-[180px] h-[120px] rounded-md border border-slate-700/15 overflow-hidden z-20"
+      style={{ background: 'rgba(8,8,20,0.85)' }}
+    >
+      {/* Location dots */}
+      {locations.map((entry) => {
+        const pos = coordsToPosition(entry.coordinates, homeCoords, entry.id)
+        return (
+          <div
+            key={`mm-${entry.id}`}
+            className={`absolute w-[3px] h-[3px] rounded-full ${dotColor(entry)}`}
+            style={{ left: `${(pos.x / CANVAS_W) * 100}%`, top: `${(pos.y / CANVAS_H) * 100}%` }}
+          />
+        )
+      })}
+      {/* Home dot */}
+      <div
+        className="absolute w-[5px] h-[5px] rounded-full bg-indigo-400"
+        style={{ left: `${(HOME_X / CANVAS_W) * 100}%`, top: `${(HOME_Y / CANVAS_H) * 100}%`, transform: 'translate(-50%,-50%)' }}
+      />
+      {/* Viewport indicator */}
+      <div
+        className="absolute border border-indigo-500/40 rounded-sm"
+        style={{
+          width: `${vpW}%`, height: `${vpH}%`,
+          left: `${vpX}%`, top: `${vpY}%`,
+          background: 'rgba(99,102,241,0.08)',
+        }}
+      />
+      {/* Home button */}
+      <button
+        onClick={onScrollHome}
+        className="absolute bottom-1 right-1.5 text-[7px] text-indigo-500 bg-indigo-500/10 px-1.5 py-0.5 rounded hover:bg-indigo-500/20 transition-colors"
+      >
+        Home
+      </button>
+    </div>
+  )
+}
+
 function DetailPanel({
   entry,
   sending,
@@ -573,7 +647,16 @@ export function GalaxyMapPage() {
           </div>
         )}
 
-        {/* Minimap — placeholder for Task 5 */}
+        {/* Minimap */}
+        <Minimap
+          locations={visibleLocations}
+          homeCoords={planet.coordinates}
+          camX={camX}
+          camY={camY}
+          viewportW={wrapRef.current?.clientWidth ?? 800}
+          viewportH={wrapRef.current?.clientHeight ?? 600}
+          onScrollHome={scrollToHome}
+        />
 
         {/* Detail panel */}
         {selected && (
