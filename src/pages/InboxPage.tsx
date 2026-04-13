@@ -18,8 +18,9 @@ function MissionTypeLabel({ type }: { type: string }) {
   return <span className={`font-medium ${color}`}>{label}</span>
 }
 
-function MissionReport({ mission, onDismiss }: { mission: Mission; onDismiss: (id: string) => void }) {
+function MissionReport({ mission, onDismiss }: { mission: Mission; onDismiss: (id: string) => Promise<void> }) {
   const [expanded, setExpanded] = useState(false)
+  const [dismissing, setDismissing] = useState(false)
   const result = mission.result as MissionResult | null
 
   return (
@@ -95,10 +96,11 @@ function MissionReport({ mission, onDismiss }: { mission: Mission; onDismiss: (i
               Dispatched {formatTimestamp(mission.dispatched_at)} · Returned {formatTimestamp(mission.returns_at)}
             </div>
             <button
-              onClick={() => onDismiss(mission.id)}
-              className="text-[10px] text-slate-600 hover:text-red-400 transition-colors"
+              onClick={async () => { setDismissing(true); await onDismiss(mission.id) }}
+              disabled={dismissing}
+              className="text-[10px] text-slate-600 hover:text-red-400 disabled:opacity-40 transition-colors"
             >
-              Dismiss
+              {dismissing ? 'Dismissing...' : 'Dismiss'}
             </button>
           </div>
         </div>
@@ -110,6 +112,8 @@ function MissionReport({ mission, onDismiss }: { mission: Mission; onDismiss: (i
 export function InboxPage() {
   const { completedMissions: rawCompleted, refetch } = useOutletContext<GameContext>()
 
+  const [clearing, setClearing] = useState(false)
+
   const completedMissions = rawCompleted
     .filter((m) => m.result)
     .sort((a, b) => new Date(b.returns_at).getTime() - new Date(a.returns_at).getTime())
@@ -120,9 +124,14 @@ export function InboxPage() {
   }
 
   const handleClearAll = async () => {
-    const ids = completedMissions.map((m) => m.id)
-    await supabase.from('missions').delete().in('id', ids)
-    await refetch()
+    setClearing(true)
+    try {
+      const ids = completedMissions.map((m) => m.id)
+      await supabase.from('missions').delete().in('id', ids)
+      await refetch()
+    } finally {
+      setClearing(false)
+    }
   }
 
   return (
@@ -135,9 +144,10 @@ export function InboxPage() {
         {completedMissions.length > 0 && (
           <button
             onClick={handleClearAll}
-            className="text-[11px] text-slate-500 hover:text-red-400 transition-colors"
+            disabled={clearing}
+            className="text-[11px] text-slate-500 hover:text-red-400 disabled:opacity-40 transition-colors"
           >
-            Clear all
+            {clearing ? 'Clearing...' : 'Clear all'}
           </button>
         )}
       </div>

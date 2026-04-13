@@ -598,7 +598,7 @@ export function GalaxyMapPage() {
             disabled={radarLevel < 1 || sending}
             className="px-3 py-1.5 text-[10px] font-medium rounded bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {radarLevel < 1 ? 'Build Radar Array' : 'Run Radar Scan'}
+            {radarLevel < 1 ? 'Build Radar Array' : sending ? 'Scanning...' : 'Run Radar Scan'}
           </button>
         </div>
       </div>
