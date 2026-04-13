@@ -55,12 +55,11 @@ Deno.serve(async (_req: Request) => {
 
     const now = new Date()
 
-    // Find all planets whose current weather has expired
+    // Find all planets whose current weather has expired or has no expiry set
     const { data: expiredWeather, error } = await supabase
       .from('planet_weather')
       .select('planet_id')
-      .lt('expires_at', now.toISOString())
-      .not('expires_at', 'is', null)
+      .or(`expires_at.lt.${now.toISOString()},expires_at.is.null`)
 
     if (error) throw error
     if (!expiredWeather || expiredWeather.length === 0) {
