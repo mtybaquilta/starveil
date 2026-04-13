@@ -66,6 +66,9 @@ Deno.serve(async (req: Request) => {
     if (action === 'resolve_mission') {
       return await handleResolveMission(supabase, user.id, planetId, body.missionId, corsHeaders)
     }
+    if (action === 'rotate_weather') {
+      return await handleRotateWeather(supabase, user.id, planetId, corsHeaders)
+    }
 
     return new Response(JSON.stringify({ error: 'Unknown action' }), {
       status: 400,
@@ -844,4 +847,73 @@ async function handleResolveMission(supabase: any, userId: string, planetId: str
   })
 
   return new Response(JSON.stringify({ success: true, result }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// ============================================================
+// Weather rotation handler
+// ============================================================
+
+const WEATHER_TYPES = [
+  { id: 'calm_skies',      metalMultiplier: 1.0,  gasMultiplier: 1.0,  energyMultiplier: 1.0,  durationMinHours: 4, durationMaxHours: 6, weight: 26.5 },
+  { id: 'solar_flare',     metalMultiplier: 1.0,  gasMultiplier: 1.0,  energyMultiplier: 1.3,  durationMinHours: 2, durationMaxHours: 3, weight: 26.5 },
+  { id: 'metal_vein',      metalMultiplier: 1.25, gasMultiplier: 1.0,  energyMultiplier: 1.0,  durationMinHours: 3, durationMaxHours: 4, weight: 10   },
+  { id: 'gas_pocket',      metalMultiplier: 1.0,  gasMultiplier: 1.25, energyMultiplier: 1.0,  durationMinHours: 3, durationMaxHours: 4, weight: 10   },
+  { id: 'ion_storm',       metalMultiplier: 1.0,  gasMultiplier: 0.8,  energyMultiplier: 0.6,  durationMinHours: 2, durationMaxHours: 3, weight: 10   },
+  { id: 'dust_storm',      metalMultiplier: 0.7,  gasMultiplier: 1.0,  energyMultiplier: 0.85, durationMinHours: 2, durationMaxHours: 4, weight: 4    },
+  { id: 'solar_storm',     metalMultiplier: 0.5,  gasMultiplier: 0.5,  energyMultiplier: 0.4,  durationMinHours: 1, durationMaxHours: 2, weight: 5    },
+  { id: 'asteroid_shower', metalMultiplier: 1.8,  gasMultiplier: 0.6,  energyMultiplier: 0.9,  durationMinHours: 1, durationMaxHours: 1, weight: 4    },
+  { id: 'nebula_drift',    metalMultiplier: 0.9,  gasMultiplier: 1.8,  energyMultiplier: 1.1,  durationMinHours: 1, durationMaxHours: 1, weight: 4    },
+]
+
+const TOTAL_WEATHER_WEIGHT = WEATHER_TYPES.reduce((s, w) => s + w.weight, 0)
+
+// deno-lint-ignore no-explicit-any
+async function handleRotateWeather(supabase: any, userId: string, planetId: string, cors: Record<string, string>) {
+  const { data: planet } = await supabase.from('planets').select('id').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const now = new Date()
+
+  // Check if current weather has expired
+  const { data: current } = await supabase
+    .from('planet_weather')
+    .select('id, expires_at')
+    .eq('planet_id', planetId)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (current && current.expires_at && new Date(current.expires_at) > now) {
+    return new Response(JSON.stringify({ success: true, rotated: false }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Roll new weather
+  let roll = Math.random() * TOTAL_WEATHER_WEIGHT
+  let weather = WEATHER_TYPES[0]
+  for (const w of WEATHER_TYPES) {
+    roll -= w.weight
+    if (roll <= 0) { weather = w; break }
+  }
+
+  const durationHours = weather.durationMinHours + Math.random() * (weather.durationMaxHours - weather.durationMinHours)
+  const expiresAt = new Date(now.getTime() + durationHours * 3600 * 1000)
+
+  await supabase.from('planet_weather').insert({
+    planet_id: planetId,
+    weather_type: weather.id,
+    metal_multiplier: weather.metalMultiplier,
+    gas_multiplier: weather.gasMultiplier,
+    energy_multiplier: weather.energyMultiplier,
+    started_at: now.toISOString(),
+    expires_at: expiresAt.toISOString(),
+  })
+
+  await supabase.from('planet_events').insert({
+    planet_id: planetId,
+    event_type: 'weather_changed',
+    message: `Weather changed to ${weather.id.replace(/_/g, ' ')} — lasts ${Math.round(durationHours * 10) / 10}h`,
+    metadata: { weather_type: weather.id, expires_at: expiresAt.toISOString() },
+  })
+
+  return new Response(JSON.stringify({ success: true, rotated: true, weather: weather.id, expiresAt: expiresAt.toISOString() }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }

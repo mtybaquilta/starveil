@@ -22,13 +22,12 @@ function formatTime(seconds: number): string {
 }
 
 export function ResearchPage() {
-  const { buildings, technologies, researchQueue, resources, refetch } = useOutletContext<GameContext>()
+  const { buildings, technologies, activeResearch, researchTimeRemaining, resources, refetch } = useOutletContext<GameContext>()
   const [activeBranch, setActiveBranch] = useState<TechBranch>('military')
   const [researching, setResearching] = useState<string | null>(null)
 
   const techLevels = new Map(technologies.map((t) => [t.tech_id, t.level]))
   const labLevel = buildings.find((b) => b.building_id === 'research_lab')?.level ?? 0
-  const activeResearch = researchQueue[0] ?? null
 
   const getTechLevel = (techId: string) => techLevels.get(techId) ?? 0
 
@@ -74,6 +73,7 @@ export function ResearchPage() {
     <ResearchPageInner
       labLevel={labLevel}
       activeResearch={activeResearch}
+      researchTimeRemaining={researchTimeRemaining}
       activeBranch={activeBranch}
       setActiveBranch={setActiveBranch}
       getTechLevel={getTechLevel}
@@ -88,6 +88,7 @@ export function ResearchPage() {
 function ResearchPageInner({
   labLevel,
   activeResearch,
+  researchTimeRemaining,
   activeBranch,
   setActiveBranch,
   getTechLevel,
@@ -97,6 +98,7 @@ function ResearchPageInner({
 }: {
   labLevel: number
   activeResearch: { tech_id: string; target_level: number; completes_at: string } | null
+  researchTimeRemaining: number | null
   activeBranch: TechBranch
   setActiveBranch: (b: TechBranch) => void
   getTechLevel: (id: string) => number
@@ -138,7 +140,9 @@ function ResearchPageInner({
               Researching: {TECHNOLOGIES.find((t) => t.id === activeResearch.tech_id)?.name} → Lv.{activeResearch.target_level}
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
-              Done: {new Date(activeResearch.completes_at).toLocaleTimeString()}
+              {researchTimeRemaining !== null && researchTimeRemaining > 0
+                ? formatTime(researchTimeRemaining)
+                : 'Completing...'}
             </div>
           </div>
         )}

@@ -6,6 +6,8 @@ import { useResources } from '../hooks/useResources'
 import { useConstructionQueue } from '../hooks/useConstructionQueue'
 import { useShipQueue } from '../hooks/useShipQueue'
 import { useMissions } from '../hooks/useMissions'
+import { useResearchQueue } from '../hooks/useResearchQueue'
+import { useWeather } from '../hooks/useWeather'
 
 export function Layout() {
   const {
@@ -29,6 +31,12 @@ export function Layout() {
     missions,
     refetch
   )
+  const { activeResearch, researchTimeRemaining } = useResearchQueue(
+    planet?.id,
+    researchQueue,
+    refetch
+  )
+  useWeather(planet?.id, weather, refetch)
 
   if (loading) {
     return (
@@ -88,6 +96,8 @@ export function Layout() {
               galaxyMap,
               technologies,
               researchQueue,
+              activeResearch,
+              researchTimeRemaining,
               refetch,
             }}
           />
@@ -116,5 +126,7 @@ export type GameContext = {
   galaxyMap: ReturnType<typeof usePlanet>['galaxyMap']
   technologies: ReturnType<typeof usePlanet>['technologies']
   researchQueue: ReturnType<typeof usePlanet>['researchQueue']
+  activeResearch: ReturnType<typeof useResearchQueue>['activeResearch']
+  researchTimeRemaining: ReturnType<typeof useResearchQueue>['researchTimeRemaining']
   refetch: () => Promise<void>
 }
