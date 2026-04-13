@@ -67,7 +67,7 @@ function BuildingPanel({ activeBuild, timeRemaining }: { activeBuild: Constructi
 
 function ShipPanel({ activeShipBuild, shipTimeRemaining }: { activeShipBuild: ShipQueueItem; shipTimeRemaining: number | null }) {
   const config = getShipConfig(activeShipBuild.ship_type)
-  const totalMs = new Date(activeShipBuild.completes_at).getTime() - new Date(activeShipBuild.started_at).getTime()
+  const totalMs = new Date(activeShipBuild.completes_at!).getTime() - new Date(activeShipBuild.started_at).getTime()
   const elapsedMs = totalMs - (shipTimeRemaining ?? 0)
   const progress = totalMs > 0 ? Math.min(100, (elapsedMs / totalMs) * 100) : 0
 
