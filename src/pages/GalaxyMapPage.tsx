@@ -73,7 +73,7 @@ function LocationNode({
   isSelected: boolean
   onSelect: () => void
 }) {
-  const pos = coordsToPosition(\1, \2)
+  const pos = coordsToPosition(entry.coordinates, homeCoords)
   const isDetected = entry.visibility === 'detected'
   const type = entry.location_type
 
@@ -160,7 +160,7 @@ function Minimap({
     >
       {/* Location dots */}
       {locations.map((entry) => {
-        const pos = coordsToPosition(\1, \2)
+        const pos = coordsToPosition(entry.coordinates, homeCoords)
         return (
           <div
             key={`mm-${entry.id}`}
@@ -488,7 +488,7 @@ export function GalaxyMapPage() {
     if (!target) return
     const entry = visibleLocations.find((loc) => loc.coordinates === target)
     if (entry) {
-      const pos = coordsToPosition(\1, \2)
+      const pos = coordsToPosition(entry.coordinates, planet.coordinates)
       const w = wrapRef.current?.clientWidth ?? 800
       const h = wrapRef.current?.clientHeight ?? 600
       const clamped = clamp(pos.x - w / 2, pos.y - h / 2)
@@ -591,7 +591,7 @@ export function GalaxyMapPage() {
           {/* Connection lines */}
           <svg className="absolute inset-0 pointer-events-none z-[1]" width={CANVAS_W} height={CANVAS_H}>
             {visibleLocations.map((entry) => {
-              const pos = coordsToPosition(\1, \2)
+              const pos = coordsToPosition(entry.coordinates, planet.coordinates)
               const dx = pos.x - HOME_X
               const dy = pos.y - HOME_Y
               if (Math.sqrt(dx * dx + dy * dy) > CONNECTION_RADIUS) return null
