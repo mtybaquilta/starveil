@@ -552,10 +552,9 @@ async function handleRunRadar(supabase: any, userId: string, planetId: string, c
   const detected = []
 
   for (let i = 0; i < detectCount; i++) {
-    const maxRange = radarLevel * 20
-    const dist = Math.floor(Math.random() * maxRange) + 5
+    const maxRange = radarLevel * 10
     const dir = Math.random() > 0.5 ? 1 : -1
-    const sysOff = Math.floor(Math.random() * dist + 1) * dir
+    const sysOff = (Math.floor(Math.random() * maxRange) + 1) * dir
     const coords = `${homeCoord.galaxy}:${Math.max(1, homeCoord.system + sysOff)}:${Math.floor(Math.random() * 15) + 1}`
 
     await supabase.from('galaxy_map').upsert({
