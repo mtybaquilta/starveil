@@ -128,6 +128,7 @@ function Minimap({
   viewportW,
   viewportH,
   onScrollHome,
+  panelOpen,
 }: {
   locations: GalaxyMapEntry[]
   homeCoords: string
@@ -136,6 +137,7 @@ function Minimap({
   viewportW: number
   viewportH: number
   onScrollHome: () => void
+  panelOpen: boolean
 }) {
   const vpW = (viewportW / CANVAS_W) * 100
   const vpH = (viewportH / CANVAS_H) * 100
@@ -155,8 +157,8 @@ function Minimap({
   return (
     <div
       data-clickable
-      className="absolute bottom-3 right-3 w-[180px] h-[120px] rounded-md border border-slate-700/15 overflow-hidden z-20"
-      style={{ background: 'rgba(8,8,20,0.85)' }}
+      className="absolute right-3 w-[180px] h-[120px] rounded-md border border-slate-700/15 overflow-hidden z-[30] transition-[bottom] duration-[250ms] ease-out"
+      style={{ background: 'rgba(8,8,20,0.85)', bottom: panelOpen ? '154px' : '12px' }}
     >
       {/* Location dots */}
       {locations.map((entry) => {
@@ -640,6 +642,7 @@ export function GalaxyMapPage() {
           viewportW={wrapRef.current?.clientWidth ?? 800}
           viewportH={wrapRef.current?.clientHeight ?? 600}
           onScrollHome={scrollToHome}
+          panelOpen={!!selected}
         />
 
         {/* Detail panel */}
