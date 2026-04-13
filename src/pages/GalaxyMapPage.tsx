@@ -49,6 +49,93 @@ function coordsToPosition(
   }
 }
 
+function AsteroidTile() {
+  return (
+    <>
+      <div className="w-[20px] h-[13px] rounded-[40%] -rotate-[10deg]" style={{ background: 'radial-gradient(ellipse, #78716c, #44403c 70%)' }} />
+      <div className="absolute w-[10px] h-[7px] rounded-[40%] top-[8px] right-[7px] rotate-[15deg]" style={{ background: 'radial-gradient(ellipse, #a8a29e, #57534e 70%)' }} />
+      <div className="absolute w-[6px] h-[4px] rounded-full bg-stone-500 bottom-[9px] left-[8px]" />
+    </>
+  )
+}
+
+function BanditTile() {
+  return (
+    <>
+      <div className="w-[20px] h-[20px] rounded-[3px] rotate-45 border border-red-500/25" style={{ background: 'linear-gradient(135deg, #374151, #1f2937)' }} />
+      <div className="absolute w-1 h-1 rounded-full bg-red-500 top-[12px] left-1/2 -translate-x-1/2" style={{ boxShadow: '0 0 6px rgba(239,68,68,0.5)' }} />
+    </>
+  )
+}
+
+function DebrisTile() {
+  return (
+    <>
+      <div className="absolute w-[16px] h-[8px] rounded-sm rotate-[20deg] top-[12px] left-[7px]" style={{ background: 'linear-gradient(135deg, #64748b, #475569)' }} />
+      <div className="absolute w-[9px] h-[5px] rounded-sm -rotate-[12deg] bottom-[10px] right-[8px]" style={{ background: 'linear-gradient(135deg, #94a3b8, #64748b)' }} />
+      <div className="absolute w-[5px] h-[4px] rounded-sm bg-slate-600 rotate-[35deg] top-[19px] right-[12px]" />
+    </>
+  )
+}
+
+function LocationNode({
+  entry,
+  homeCoords,
+  isSelected,
+  onSelect,
+}: {
+  entry: GalaxyMapEntry
+  homeCoords: string
+  isSelected: boolean
+  onSelect: () => void
+}) {
+  const pos = coordsToPosition(entry.coordinates, homeCoords, entry.id)
+  const isDetected = entry.visibility === 'detected'
+  const type = entry.location_type
+
+  const tileClasses = isDetected
+    ? 'w-[36px] h-[36px] rounded-full border-[1.5px] border-dashed border-yellow-500/35 bg-yellow-500/[0.04]'
+    : type === 'asteroid_field'
+      ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-amber-500/15 bg-gradient-to-br from-stone-500/25 to-stone-700/35'
+      : type === 'bandit_camp'
+        ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-red-500/20 bg-gradient-to-br from-red-900/25 to-red-950/30'
+        : type === 'debris_field'
+          ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-slate-400/12 bg-gradient-to-br from-slate-600/30 to-slate-800/45'
+          : 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-slate-700/20 bg-slate-800/30'
+
+  const labelColor = isDetected
+    ? 'text-yellow-500/45'
+    : type === 'asteroid_field' ? 'text-amber-400'
+    : type === 'bandit_camp' ? 'text-red-400'
+    : type === 'debris_field' ? 'text-slate-400'
+    : 'text-slate-500'
+
+  return (
+    <div
+      data-clickable
+      onClick={onSelect}
+      className={`absolute flex flex-col items-center gap-1 cursor-pointer z-[5] transition-transform hover:scale-110 ${isSelected ? 'z-10' : ''}`}
+      style={{ left: pos.x, top: pos.y, transform: 'translate(-50%, -50%)' }}
+    >
+      <div
+        className={`relative flex items-center justify-center overflow-hidden transition-all ${tileClasses} ${
+          isSelected ? '!border-indigo-500/70 shadow-[0_0_24px_rgba(99,102,241,0.3)]' : ''
+        }`}
+      >
+        {isDetected && (
+          <span className="text-[15px] text-yellow-500/50 font-bold animate-pulse">?</span>
+        )}
+        {!isDetected && type === 'asteroid_field' && <AsteroidTile />}
+        {!isDetected && type === 'bandit_camp' && <BanditTile />}
+        {!isDetected && type === 'debris_field' && <DebrisTile />}
+      </div>
+      <div className={`text-[8px] font-semibold text-center max-w-[70px] leading-tight ${labelColor}`}>
+        {isDetected ? entry.coordinates : entry.name ?? entry.location_type?.replace(/_/g, ' ') ?? entry.coordinates}
+      </div>
+    </div>
+  )
+}
+
 function HomePlanet({ name, coords }: { name: string; coords: string }) {
   return (
     <div
@@ -310,24 +397,16 @@ export function GalaxyMapPage() {
           {/* Home planet */}
           <HomePlanet name={planet.name} coords={planet.coordinates} />
 
-          {/* Location nodes — placeholder for Task 3 */}
-          {visibleLocations.map((entry) => {
-            const pos = coordsToPosition(entry.coordinates, planet.coordinates, entry.id)
-            return (
-              <div
-                key={entry.id}
-                data-clickable
-                onClick={() => setSelected(selected?.id === entry.id ? null : entry)}
-                className="absolute flex flex-col items-center gap-1 cursor-pointer z-[5] hover:scale-110 transition-transform"
-                style={{ left: pos.x, top: pos.y, transform: 'translate(-50%, -50%)' }}
-              >
-                <div className="w-[50px] h-[50px] rounded-lg bg-slate-800/40 border border-slate-700/20 flex items-center justify-center text-xs text-slate-500">
-                  {entry.visibility === 'detected' ? '?' : entry.location_type?.[0] ?? '·'}
-                </div>
-                <div className="text-[8px] text-slate-500 font-mono">{entry.coordinates}</div>
-              </div>
-            )
-          })}
+          {/* Location nodes */}
+          {visibleLocations.map((entry) => (
+            <LocationNode
+              key={entry.id}
+              entry={entry}
+              homeCoords={planet.coordinates}
+              isSelected={selected?.id === entry.id}
+              onSelect={() => setSelected(selected?.id === entry.id ? null : entry)}
+            />
+          ))}
         </div>
 
         {/* Empty state */}
