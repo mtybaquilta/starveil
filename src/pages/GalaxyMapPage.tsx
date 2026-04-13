@@ -244,7 +244,7 @@ function DetailPanel({
   return (
     <div
       data-clickable
-      className="absolute bottom-0 left-0 right-0 z-[15] border-t border-slate-700/15 px-5 py-4 backdrop-blur-xl transition-transform duration-[250ms] ease-out"
+      className="absolute bottom-0 left-0 right-0 z-[25] border-t border-slate-700/15 px-5 py-4 backdrop-blur-xl transition-transform duration-[250ms] ease-out"
       style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.95), rgba(8,12,20,0.98))' }}
     >
       <div className="flex gap-6 items-start">
