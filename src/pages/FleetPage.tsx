@@ -1,13 +1,15 @@
-import { useOutletContext } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { SHIPS } from '../config/ships'
 import { formatTime } from '../hooks/useConstructionQueue'
 import type { GameContext } from '../components/Layout'
 
 export function FleetPage() {
-  const { shipFleet, activeShipBuild, shipTimeRemaining, activeMissions } = useOutletContext<GameContext>()
+  const { planet, shipFleet, activeShipBuild, shipBuildQueue, shipTimeRemaining, activeMissions, refetch } = useOutletContext<GameContext>()
+  const navigate = useNavigate()
 
   const fleetCounts = new Map(shipFleet.map((s) => [s.ship_type, s.count]))
-  const totalShips = shipFleet.reduce((sum, s) => sum + s.count, 0)
 
   // Compute deployed ships from active missions
   const deployedCounts = new Map<string, number>()
@@ -17,47 +19,105 @@ export function FleetPage() {
     }
   }
 
-  return (
-    <div>
-      <h1 className="text-lg font-bold text-slate-100 mb-1">Fleet</h1>
-      <p className="text-xs text-slate-500 mb-6">
-        {totalShips === 0 ? 'No ships in your fleet yet' : `${totalShips} ship${totalShips !== 1 ? 's' : ''} at this planet`}
-      </p>
+  // Compute aggregate fleet power
+  const totals = SHIPS.reduce(
+    (acc, ship) => {
+      const count = fleetCounts.get(ship.id) ?? 0
+      acc.attack += count * ship.stats.attackPower
+      acc.defense += count * ship.stats.defenseRating
+      acc.cargo += count * ship.stats.cargoCapacity
+      acc.ships += count
+      return acc
+    },
+    { attack: 0, defense: 0, cargo: 0, ships: 0 }
+  )
 
-      {/* Active Construction */}
-      {activeShipBuild && (
-        <div className="bg-slate-800/30 rounded-xl p-5 border border-sky-700/20 mb-6">
-          <h2 className="text-sm font-semibold text-slate-200 mb-3">Under Construction</h2>
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">{SHIPS.find((s) => s.id === activeShipBuild.ship_type)?.icon}</span>
-            <div className="flex-1">
-              <div className="text-xs font-semibold text-slate-200">
-                {SHIPS.find((s) => s.id === activeShipBuild.ship_type)?.name} ×{activeShipBuild.quantity}
-              </div>
-              <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                <ProgressBar startedAt={activeShipBuild.started_at} completesAt={activeShipBuild.completes_at} timeRemaining={shipTimeRemaining} />
-              </div>
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-lg font-bold text-slate-100 mb-1">Fleet</h1>
+        <p className="text-xs text-slate-500">Manage your ships, scrap hulls, or deploy to missions</p>
+      </div>
+
+      {/* Build Queue */}
+      {shipBuildQueue.length > 0 && (
+        <div className="bg-slate-800/30 rounded-xl p-5 border border-sky-700/20">
+          <h2 className="text-sm font-semibold text-slate-200 mb-3">
+            Build Queue {shipBuildQueue.length > 1 && <span className="text-slate-500 font-normal">({shipBuildQueue.length})</span>}
+          </h2>
+          <div className="space-y-3">
+            {shipBuildQueue.map((item, i) => {
+              const ship = SHIPS.find((s) => s.id === item.ship_type)
+              const isActive = item.completes_at !== null
+              return (
+                <div key={item.id} className="flex items-center gap-3">
+                  <span className="text-2xl">{ship?.icon}</span>
+                  <div className="flex-1">
+                    <div className="text-xs font-semibold text-slate-200">
+                      {ship?.name} ×{item.quantity}
+                      {!isActive && <span className="text-slate-500 ml-2">Queued #{i + 1}</span>}
+                    </div>
+                    {isActive && (
+                      <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                        <ProgressBar startedAt={item.started_at} completesAt={item.completes_at!} timeRemaining={shipTimeRemaining} />
+                      </div>
+                    )}
+                  </div>
+                  {isActive ? (
+                    <div className="text-sm font-bold text-sky-400">
+                      {shipTimeRemaining !== null ? formatTime(shipTimeRemaining) : '...'}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-500">Waiting</div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Power Banner */}
+      {totals.ships > 0 && (
+        <div className="bg-gradient-to-r from-indigo-950/60 to-slate-900/60 rounded-xl p-5 border border-indigo-800/20">
+          <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">Fleet Power</div>
+          <div className="flex gap-8">
+            <div>
+              <div className="text-xl font-bold text-orange-400">{totals.attack}</div>
+              <div className="text-[10px] text-slate-500">Attack</div>
             </div>
-            <div className="text-sm font-bold text-sky-400">
-              {shipTimeRemaining !== null ? formatTime(shipTimeRemaining) : '...'}
+            <div>
+              <div className="text-xl font-bold text-blue-400">{totals.defense}</div>
+              <div className="text-[10px] text-slate-500">Defense</div>
+            </div>
+            <div>
+              <div className="text-xl font-bold text-purple-400">{totals.cargo.toLocaleString()}</div>
+              <div className="text-[10px] text-slate-500">Cargo</div>
+            </div>
+            <div>
+              <div className="text-xl font-bold text-emerald-400">{totals.ships}</div>
+              <div className="text-[10px] text-slate-500">Ships</div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Fleet Roster */}
-      <div className="grid grid-cols-3 gap-4 max-w-5xl">
+      {/* Ship List Rows */}
+      <div className="space-y-2">
         {SHIPS.map((ship) => {
           const count = fleetCounts.get(ship.id) ?? 0
           const deployed = deployedCounts.get(ship.id) ?? 0
           const available = count - deployed
           return (
-            <FleetCard
+            <ShipRow
               key={ship.id}
               ship={ship}
               count={count}
               available={available}
               deployed={deployed}
+              planetId={planet.id}
+              onScrap={refetch}
+              onDeploy={() => navigate(`/missions?ship=${ship.id}`)}
             />
           )
         })}
@@ -66,41 +126,90 @@ export function FleetPage() {
   )
 }
 
-function FleetCard({
+function ShipRow({
   ship,
   count,
   available,
   deployed,
+  planetId,
+  onScrap,
+  onDeploy,
 }: {
   ship: (typeof SHIPS)[number]
   count: number
   available: number
   deployed: number
+  planetId: string
+  onScrap: () => Promise<void>
+  onDeploy: () => void
 }) {
+  const [scrapping, setScrapping] = useState(false)
+
+  async function handleScrap() {
+    setScrapping(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('game-action', {
+        body: { action: 'scrap_ship', planetId, shipType: ship.id },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      await onScrap()
+    } catch (err) {
+      console.error('Failed to scrap ship:', err)
+    } finally {
+      setScrapping(false)
+    }
+  }
+
+  const canScrap = available > 0
+  const canDeploy = available > 0
+
   return (
-    <div className={`bg-slate-800/40 rounded-xl border border-slate-700/20 overflow-hidden flex flex-col transition-opacity ${count === 0 ? 'opacity-40' : ''}`}>
-      {/* Header */}
-      <div className="px-4 pt-4 pb-3 flex flex-col flex-1">
-        <div className="text-sm font-bold text-slate-100">{ship.name}</div>
-        <div className="text-[11px] text-slate-500 mt-0.5 leading-relaxed flex-1">{ship.description}</div>
+    <div className={`bg-slate-800/40 rounded-lg border border-slate-700/20 px-4 py-3 flex items-center gap-4 transition-opacity ${count === 0 ? 'opacity-40' : ''}`}>
+      {/* Icon + Name */}
+      <div className="flex items-center gap-3 min-w-[160px]">
+        <span className="text-2xl">{ship.icon}</span>
+        <div>
+          <div className="text-sm font-semibold text-slate-200">{ship.name}</div>
+          <div className="text-[10px] text-slate-500">
+            Spd {ship.stats.speed} · Atk {ship.stats.attackPower} · Def {ship.stats.defenseRating} · Cargo {ship.stats.cargoCapacity.toLocaleString()}
+          </div>
+        </div>
       </div>
 
-      {/* Full-width image */}
-      <img src={ship.image} alt={ship.name} className="w-full h-36 object-cover" />
+      {/* Spacer */}
+      <div className="flex-1" />
 
-      {/* Counts */}
-      <div className="px-4 py-3 flex items-center justify-between mt-auto">
-        <div>
-          <div className={`text-2xl font-bold ${count > 0 ? 'text-slate-100' : 'text-slate-600'}`}>{available}</div>
-          <div className="text-[10px] text-slate-500">available</div>
+      {/* Count */}
+      <div className="text-center min-w-[60px]">
+        <div className="text-lg font-bold text-slate-100">
+          {available}<span className="text-sm text-slate-500">/{count}</span>
         </div>
-        <div className="text-right">
-          <div className="text-sm font-semibold text-slate-400">{count}</div>
-          <div className="text-[10px] text-slate-500">total</div>
-          {deployed > 0 && (
-            <div className="text-[10px] text-indigo-400 mt-0.5">{deployed} on mission</div>
-          )}
+        <div className="text-[10px] text-slate-500">
+          {deployed > 0 ? (
+            <span className="text-indigo-400">{deployed} deployed</span>
+          ) : count > 0 ? (
+            <span className="text-emerald-500">all home</span>
+          ) : null}
         </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2 min-w-[160px] justify-end">
+        <button
+          onClick={handleScrap}
+          disabled={!canScrap || scrapping}
+          className="px-3 py-1.5 text-[11px] font-medium rounded-md bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          {scrapping ? 'Scrapping...' : 'Scrap'}
+        </button>
+        <button
+          onClick={onDeploy}
+          disabled={!canDeploy}
+          className="px-3 py-1.5 text-[11px] font-medium rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          Deploy →
+        </button>
       </div>
     </div>
   )

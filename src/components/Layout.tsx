@@ -21,7 +21,7 @@ export function Layout() {
     constructionQueue,
     refetch
   )
-  const { activeShipBuild, shipTimeRemaining, startShipBuild } = useShipQueue(
+  const { activeShipBuild, shipTimeRemaining, shipQueue: shipBuildQueue, startShipBuild } = useShipQueue(
     planet?.id,
     shipQueue,
     refetch
@@ -88,6 +88,7 @@ export function Layout() {
               startBuild,
               activeShipBuild,
               shipTimeRemaining,
+              shipBuildQueue,
               startShipBuild,
               shipFleet,
               missions,
@@ -118,6 +119,7 @@ export type GameContext = {
   startBuild: ReturnType<typeof useConstructionQueue>['startBuild']
   activeShipBuild: ReturnType<typeof useShipQueue>['activeShipBuild']
   shipTimeRemaining: ReturnType<typeof useShipQueue>['shipTimeRemaining']
+  shipBuildQueue: ReturnType<typeof useShipQueue>['shipQueue']
   startShipBuild: ReturnType<typeof useShipQueue>['startShipBuild']
   shipFleet: ReturnType<typeof usePlanet>['shipFleet']
   missions: ReturnType<typeof usePlanet>['missions']
