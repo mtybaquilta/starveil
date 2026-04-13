@@ -199,12 +199,14 @@ function Minimap({
 function DetailPanel({
   entry,
   sending,
+  probeCount,
   onSendProbe,
   onNavigateMission,
   onDeselect,
 }: {
   entry: GalaxyMapEntry
   sending: boolean
+  probeCount: number
   onSendProbe: (coords: string) => void
   onNavigateMission: (coords: string, type: string) => void
   onDeselect: () => void
@@ -303,11 +305,11 @@ function DetailPanel({
           {isDetected && (
             <button
               onClick={() => onSendProbe(entry.coordinates)}
-              disabled={sending}
+              disabled={sending || probeCount === 0}
               className="w-full py-2 text-[11px] font-semibold rounded-lg text-yellow-300 border border-yellow-500/30 disabled:opacity-40 transition-colors"
               style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.35), rgba(180,130,6,0.45))' }}
             >
-              {sending ? 'Sending...' : 'Send Probe'}
+              {sending ? 'Sending...' : probeCount === 0 ? 'No Probes' : 'Send Probe'}
             </button>
           )}
           {!isDetected && type === 'asteroid_field' && (
@@ -433,7 +435,7 @@ function MissionDot({
 }
 
 export function GalaxyMapPage() {
-  const { planet, galaxyMap, buildings, refetch, activeMissions } = useOutletContext<GameContext>()
+  const { planet, galaxyMap, buildings, shipFleet, refetch, activeMissions } = useOutletContext<GameContext>()
   const navigate = useNavigate()
 
   const [camX, setCamX] = useState(0)
@@ -732,6 +734,7 @@ export function GalaxyMapPage() {
           <DetailPanel
             entry={selected}
             sending={sending}
+            probeCount={shipFleet.find((s) => s.ship_type === 'probe')?.count ?? 0}
             onSendProbe={handleSendProbe}
             onNavigateMission={(coords, type) => navigate(`/missions?target=${coords}&type=${type}`)}
             onDeselect={() => setSelected(null)}

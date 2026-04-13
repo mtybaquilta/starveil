@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useOutletContext } from 'react-router-dom'
 import { SHIPS, getShipConfig } from '../config/ships'
@@ -108,11 +109,16 @@ function ShipCard({
   gas: number
   onBuild: () => Promise<void> | void
 }) {
+  const [building, setBuilding] = useState(false)
+
   async function handleBuild() {
+    setBuilding(true)
     try {
       await onBuild()
     } catch (err) {
       console.error('Failed to build ship:', err)
+    } finally {
+      setBuilding(false)
     }
   }
 
@@ -187,10 +193,10 @@ function ShipCard({
 
         <button
           onClick={handleBuild}
-          disabled={!canBuild}
+          disabled={!canBuild || building}
           className="w-full py-2.5 bg-sky-500 hover:bg-sky-400 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
         >
-          {queueFull ? 'Queue Full' : !canAfford ? 'Insufficient Resources' : 'Build →'}
+          {building ? 'Building...' : queueFull ? 'Queue Full' : !canAfford ? 'Insufficient Resources' : 'Build →'}
         </button>
       </div>
     </div>
