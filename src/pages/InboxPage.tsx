@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import type { GameContext } from '../components/Layout'
 import type { Mission, MissionResult } from '../hooks/usePlanet'
 
@@ -17,7 +18,7 @@ function MissionTypeLabel({ type }: { type: string }) {
   return <span className={`font-medium ${color}`}>{label}</span>
 }
 
-function MissionReport({ mission }: { mission: Mission }) {
+function MissionReport({ mission, onDismiss }: { mission: Mission; onDismiss: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false)
   const result = mission.result as MissionResult | null
 
@@ -89,8 +90,16 @@ function MissionReport({ mission }: { mission: Mission }) {
             </div>
           )}
 
-          <div className="text-[10px] text-slate-600">
-            Dispatched {formatTimestamp(mission.dispatched_at)} · Returned {formatTimestamp(mission.returns_at)}
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] text-slate-600">
+              Dispatched {formatTimestamp(mission.dispatched_at)} · Returned {formatTimestamp(mission.returns_at)}
+            </div>
+            <button
+              onClick={() => onDismiss(mission.id)}
+              className="text-[10px] text-slate-600 hover:text-red-400 transition-colors"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}
@@ -99,17 +108,38 @@ function MissionReport({ mission }: { mission: Mission }) {
 }
 
 export function InboxPage() {
-  const { completedMissions: rawCompleted } = useOutletContext<GameContext>()
+  const { completedMissions: rawCompleted, refetch } = useOutletContext<GameContext>()
 
   const completedMissions = rawCompleted
     .filter((m) => m.result)
     .sort((a, b) => new Date(b.returns_at).getTime() - new Date(a.returns_at).getTime())
 
+  const handleDismiss = async (id: string) => {
+    await supabase.from('missions').delete().eq('id', id)
+    await refetch()
+  }
+
+  const handleClearAll = async () => {
+    const ids = completedMissions.map((m) => m.id)
+    await supabase.from('missions').delete().in('id', ids)
+    await refetch()
+  }
+
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold text-slate-100">Inbox</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Detailed mission reports</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-slate-100">Inbox</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Detailed mission reports</p>
+        </div>
+        {completedMissions.length > 0 && (
+          <button
+            onClick={handleClearAll}
+            className="text-[11px] text-slate-500 hover:text-red-400 transition-colors"
+          >
+            Clear all
+          </button>
+        )}
       </div>
 
       {completedMissions.length === 0 ? (
@@ -121,7 +151,7 @@ export function InboxPage() {
       ) : (
         <div className="space-y-2">
           {completedMissions.map((mission) => (
-            <MissionReport key={mission.id} mission={mission} />
+            <MissionReport key={mission.id} mission={mission} onDismiss={handleDismiss} />
           ))}
         </div>
       )}
