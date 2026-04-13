@@ -43,7 +43,7 @@ export function ShipyardPage() {
         Shipyard Level {shipyardLevel} · Build times reduced by {Math.round((1 - Math.pow(0.9, shipyardLevel)) * 100)}%
       </p>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4 max-w-5xl">
         {SHIPS.map((ship) => {
           const shipyardLocked = ship.requiredShipyardLevel > shipyardLevel
           const techLocked = ship.requiredTech

@@ -46,7 +46,7 @@ export function FleetPage() {
       )}
 
       {/* Fleet Roster */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4 max-w-5xl">
         {SHIPS.map((ship) => {
           const count = fleetCounts.get(ship.id) ?? 0
           const deployed = deployedCounts.get(ship.id) ?? 0
@@ -80,7 +80,7 @@ function FleetCard({
   return (
     <div className={`bg-slate-800/40 rounded-xl border border-slate-700/20 overflow-hidden flex flex-col transition-opacity ${count === 0 ? 'opacity-40' : ''}`}>
       {/* Header */}
-      <div className="px-4 pt-4 pb-3">
+      <div className="px-4 pt-4 pb-3 flex flex-col flex-1">
         <div className="text-sm font-bold text-slate-100">{ship.name}</div>
         <div className="text-[11px] text-slate-500 mt-0.5 leading-relaxed flex-1">{ship.description}</div>
       </div>
