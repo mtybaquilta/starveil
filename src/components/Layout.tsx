@@ -61,12 +61,20 @@ export function Layout() {
         gas={resources.gas}
         metalPerHour={resources.metalPerHour}
         gasPerHour={resources.gasPerHour}
+        metalBaseRate={resources.metalBaseFromBuildings}
+        gasBaseRate={resources.gasBaseFromBuildings}
+        metalResearchBonus={resources.metalResearchBonus}
+        gasResearchBonus={resources.gasResearchBonus}
         energyProduced={resources.energyProduced}
         energyConsumed={resources.energyConsumed}
+        energyRatio={resources.energyRatio}
         planetName={planet.name}
         coordinates={planet.coordinates}
         weatherType={weather?.weather_type ?? 'calm_skies'}
         weatherExpiresAt={weather?.expires_at ?? null}
+        weatherMetalMultiplier={weather ? Number(weather.metal_multiplier) : 1}
+        weatherGasMultiplier={weather ? Number(weather.gas_multiplier) : 1}
+        weatherStationLevel={buildings.find((b) => b.building_id === 'weather_station')?.level ?? 0}
       />
       <div className="flex flex-1">
         <Sidebar
