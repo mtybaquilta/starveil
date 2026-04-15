@@ -161,7 +161,7 @@ function ShipCard({
         <p className="text-[11px] text-slate-400 leading-relaxed flex-1">{ship.description}</p>
 
         {/* Stats — 4-column: label value | label value */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-1">
           <StatRow label="Speed" value={ship.stats.speed} />
           <StatRow label="Cargo" value={ship.stats.cargoCapacity} />
           <BoostedStatRow label="Attack" base={ship.stats.attackPower} bonus={attackBonus} />
