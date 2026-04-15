@@ -1,10 +1,17 @@
 import { useOutletContext } from 'react-router-dom'
 import { getBuildingConfig } from '../config/buildings'
-import { productionPerHour, energyConsumption } from '../config/formulas'
+import { energyConsumption } from '../config/formulas'
+import { ProductionBreakdown } from '../components/ProductionBreakdown'
 import type { GameContext } from '../components/Layout'
 
+const WEATHER_NAMES: Record<string, string> = {
+  calm_skies: 'Calm Skies', solar_flare: 'Solar Flare', metal_vein: 'Metal Vein',
+  gas_pocket: 'Gas Pocket', ion_storm: 'Ion Storm', dust_storm: 'Dust Storm',
+  solar_storm: 'Solar Storm', asteroid_shower: 'Asteroid Shower', nebula_drift: 'Nebula Drift',
+}
+
 export function ResourcesPage() {
-  const { buildings, resources } = useOutletContext<GameContext>()
+  const { buildings, resources, weather } = useOutletContext<GameContext>()
 
   const buildingLevels = new Map(buildings.map((b) => [b.building_id, b.level]))
 
@@ -12,13 +19,7 @@ export function ResourcesPage() {
   const gasRefineryLevel = buildingLevels.get('gas_refinery') ?? 0
   const solarLevel = buildingLevels.get('solar_array') ?? 0
 
-  const metalMineConfig = getBuildingConfig('metal_mine')
-  const gasRefineryConfig = getBuildingConfig('gas_refinery')
-  const solarConfig = getBuildingConfig('solar_array')
-
-  const metalRaw = productionPerHour(metalMineConfig.baseProductionPerHour, metalMineLevel)
-  const gasRaw = productionPerHour(gasRefineryConfig.baseProductionPerHour, gasRefineryLevel)
-  const energyProd = productionPerHour(solarConfig.baseProductionPerHour, solarLevel)
+  const weatherName = weather ? (WEATHER_NAMES[weather.weather_type] ?? weather.weather_type) : 'Calm Skies'
 
   const energyUsers: { name: string; amount: number }[] = []
   for (const [id, level] of buildingLevels) {
@@ -45,22 +46,28 @@ export function ResourcesPage() {
           label="Metal"
           color="text-orange-400"
           bgColor="bg-orange-400"
-          rawProduction={metalRaw}
+          baseRate={resources.metalBaseFromBuildings}
+          researchBonus={resources.metalResearchBonus}
+          weatherMultiplier={weather ? Number(weather.metal_multiplier) : 1}
+          weatherLabel={weatherName}
+          energyRatio={resources.energyRatio}
           effectiveProduction={resources.metalPerHour}
           current={resources.metal}
           cap={resources.metalStorageCap}
-          energyRatio={resources.energyRatio}
           source={`Metal Mine Lv.${metalMineLevel}`}
         />
         <ResourcePanel
           label="Gas"
           color="text-violet-400"
           bgColor="bg-violet-400"
-          rawProduction={gasRaw}
+          baseRate={resources.gasBaseFromBuildings}
+          researchBonus={resources.gasResearchBonus}
+          weatherMultiplier={weather ? Number(weather.gas_multiplier) : 1}
+          weatherLabel={weatherName}
+          energyRatio={resources.energyRatio}
           effectiveProduction={resources.gasPerHour}
           current={resources.gas}
           cap={resources.gasStorageCap}
-          energyRatio={resources.energyRatio}
           source={`Gas Refinery Lv.${gasRefineryLevel}`}
         />
       </div>
@@ -71,7 +78,7 @@ export function ResourcesPage() {
         <div className="flex items-baseline gap-4 mb-4">
           <div>
             <div className="text-[9px] text-slate-500 uppercase tracking-widest">Produced</div>
-            <div className="text-xl font-bold text-green-400">{Math.floor(energyProd)}</div>
+            <div className="text-xl font-bold text-green-400">{Math.floor(resources.energyProduced)}</div>
             <div className="text-[10px] text-slate-500">Solar Array Lv.{solarLevel}</div>
           </div>
           <div className="text-slate-600 text-lg">/</div>
@@ -125,10 +132,12 @@ export function ResourcesPage() {
 }
 
 function ResourcePanel({
-  label, color, bgColor, rawProduction, effectiveProduction, current, cap, energyRatio, source,
+  label, color, bgColor, baseRate, researchBonus, weatherMultiplier, weatherLabel,
+  energyRatio, effectiveProduction, current, cap, source,
 }: {
-  label: string; color: string; bgColor: string; rawProduction: number; effectiveProduction: number
-  current: number; cap: number; energyRatio: number; source: string
+  label: string; color: string; bgColor: string; baseRate: number
+  researchBonus: number; weatherMultiplier: number; weatherLabel: string
+  energyRatio: number; effectiveProduction: number; current: number; cap: number; source: string
 }) {
   return (
     <div className="bg-slate-800/30 rounded-xl p-5 border border-slate-700/10">
@@ -143,20 +152,14 @@ function ResourcePanel({
         of {Math.floor(cap).toLocaleString()} capacity
       </div>
       <div className="mt-3 pt-3 border-t border-slate-700/10">
-        <div className="flex justify-between text-xs">
-          <span className="text-slate-500">Base production</span>
-          <span className="text-slate-300">{Math.floor(rawProduction).toLocaleString()}/h</span>
-        </div>
-        {energyRatio < 1 && (
-          <div className="flex justify-between text-xs mt-1">
-            <span className="text-yellow-400/70">Energy penalty</span>
-            <span className="text-yellow-400">×{energyRatio.toFixed(2)}</span>
-          </div>
-        )}
-        <div className="flex justify-between text-xs mt-1">
-          <span className="text-slate-500">Effective</span>
-          <span className={`font-medium ${color}`}>{Math.floor(effectiveProduction).toLocaleString()}/h</span>
-        </div>
+        <ProductionBreakdown
+          baseRate={baseRate}
+          researchBonus={researchBonus}
+          weatherMultiplier={weatherMultiplier}
+          weatherLabel={weatherLabel}
+          energyRatio={energyRatio}
+          effectiveRate={effectiveProduction}
+        />
         <div className="text-[10px] text-slate-600 mt-2">{source}</div>
       </div>
     </div>
