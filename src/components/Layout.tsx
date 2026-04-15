@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { ResourceBar } from './ResourceBar'
+import { QueueStrip } from './QueueStrip'
 import { Sidebar } from './Sidebar'
 import { usePlanet } from '../hooks/usePlanet'
 import { useResources } from '../hooks/useResources'
@@ -76,12 +77,16 @@ export function Layout() {
         weatherGasMultiplier={weather ? Number(weather.gas_multiplier) : 1}
         weatherStationLevel={buildings.find((b) => b.building_id === 'weather_station')?.level ?? 0}
       />
+      <QueueStrip
+        activeBuild={activeBuild}
+        timeRemaining={timeRemaining}
+        activeShipBuild={activeShipBuild}
+        shipTimeRemaining={shipTimeRemaining}
+        activeResearch={activeResearch}
+        researchTimeRemaining={researchTimeRemaining}
+      />
       <div className="flex flex-1">
         <Sidebar
-          activeBuild={activeBuild}
-          timeRemaining={timeRemaining}
-          activeShipBuild={activeShipBuild}
-          shipTimeRemaining={shipTimeRemaining}
           activeMissionCount={activeMissions.length}
         />
         <main className="flex-1 p-6 overflow-y-auto">

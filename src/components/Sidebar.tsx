@@ -1,13 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { ConstructionTimer } from './ConstructionTimer'
-import type { ConstructionItem, ShipQueueItem } from '../hooks/usePlanet'
 
 type Props = {
-  activeBuild: ConstructionItem | null
-  timeRemaining: number | null
-  activeShipBuild: ShipQueueItem | null
-  shipTimeRemaining: number | null
   activeMissionCount: number
 }
 
@@ -25,7 +19,7 @@ const NAV_ITEMS = [
 
 const LOCKED_ITEMS: { label: string; hint: string }[] = []
 
-export function Sidebar({ activeBuild, timeRemaining, activeShipBuild, shipTimeRemaining, activeMissionCount }: Props) {
+export function Sidebar({ activeMissionCount }: Props) {
   const { signOut } = useAuth()
 
   return (
@@ -65,12 +59,6 @@ export function Sidebar({ activeBuild, timeRemaining, activeShipBuild, shipTimeR
       </nav>
 
       <div className="mt-auto">
-        <ConstructionTimer
-          activeBuild={activeBuild}
-          timeRemaining={timeRemaining}
-          activeShipBuild={activeShipBuild}
-          shipTimeRemaining={shipTimeRemaining}
-        />
         <div className="px-4 py-3 border-t border-slate-800/30">
           <button
             onClick={signOut}
