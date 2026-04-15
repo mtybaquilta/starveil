@@ -11,6 +11,9 @@ const HOME_Y = CANVAS_H / 2
 const SYSTEM_COL_W = 200   // px per system number (horizontal)
 const POSITION_ROW_H = 80  // px per position number (vertical)
 const CONNECTION_RADIUS = 400
+const MIN_ZOOM = 0.5
+const MAX_ZOOM = 2.0
+const ZOOM_STEP = 0.25
 
 function parseCoords(coords: string): { galaxy: number; system: number; position: number } {
   const [g, s, p] = coords.split(':').map(Number)
@@ -127,7 +130,9 @@ function Minimap({
   camY,
   viewportW,
   viewportH,
+  zoom,
   onScrollHome,
+  onMinimapClick,
   panelOpen,
 }: {
   locations: GalaxyMapEntry[]
@@ -136,13 +141,30 @@ function Minimap({
   camY: number
   viewportW: number
   viewportH: number
+  zoom: number
   onScrollHome: () => void
+  onMinimapClick: (camX: number, camY: number) => void
   panelOpen: boolean
 }) {
-  const vpW = (viewportW / CANVAS_W) * 100
-  const vpH = (viewportH / CANVAS_H) * 100
+  const visibleW = viewportW / zoom
+  const visibleH = viewportH / zoom
+  const vpW = (visibleW / CANVAS_W) * 100
+  const vpH = (visibleH / CANVAS_H) * 100
   const vpX = (camX / CANVAS_W) * 100
   const vpY = (camY / CANVAS_H) * 100
+
+  function handleClick(e: React.MouseEvent<HTMLDivElement>) {
+    // Don't trigger on the Home button
+    if ((e.target as HTMLElement).closest('button')) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const relX = (e.clientX - rect.left) / rect.width
+    const relY = (e.clientY - rect.top) / rect.height
+    const canvasX = relX * CANVAS_W
+    const canvasY = relY * CANVAS_H
+    const newCamX = canvasX - visibleW / 2
+    const newCamY = canvasY - visibleH / 2
+    onMinimapClick(newCamX, newCamY)
+  }
 
   const dotColor = (entry: GalaxyMapEntry) => {
     if (entry.visibility === 'detected') return 'bg-yellow-500/40'
@@ -157,8 +179,9 @@ function Minimap({
   return (
     <div
       data-clickable
-      className="absolute right-3 w-[180px] h-[120px] rounded-md border border-slate-700/15 overflow-hidden z-[30] transition-[bottom] duration-[250ms] ease-out"
+      className="absolute right-3 w-[180px] h-[120px] rounded-md border border-slate-700/15 overflow-hidden z-[30] transition-[bottom] duration-[250ms] ease-out cursor-crosshair"
       style={{ background: 'rgba(8,8,20,0.85)', bottom: panelOpen ? '154px' : '12px' }}
+      onClick={handleClick}
     >
       {/* Location dots */}
       {locations.map((entry) => {
@@ -440,6 +463,7 @@ export function GalaxyMapPage() {
 
   const [camX, setCamX] = useState(0)
   const [camY, setCamY] = useState(0)
+  const [zoom, setZoom] = useState(1.0)
   const [isDragging, setIsDragging] = useState(false)
   const [selected, setSelected] = useState<GalaxyMapEntry | null>(null)
   const [sending, setSending] = useState(false)
@@ -475,14 +499,16 @@ export function GalaxyMapPage() {
     return () => clearInterval(id)
   }, [])
 
-  const clamp = useCallback((x: number, y: number) => {
+  const clamp = useCallback((x: number, y: number, z = zoom) => {
     const w = wrapRef.current?.clientWidth ?? 800
     const h = wrapRef.current?.clientHeight ?? 600
+    const visibleW = w / z
+    const visibleH = h / z
     return {
-      x: Math.max(0, Math.min(CANVAS_W - w, x)),
-      y: Math.max(0, Math.min(CANVAS_H - h, y)),
+      x: Math.max(0, Math.min(CANVAS_W - visibleW, x)),
+      y: Math.max(0, Math.min(CANVAS_H - visibleH, y)),
     }
-  }, [])
+  }, [zoom])
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('[data-clickable]')) return
@@ -507,10 +533,57 @@ export function GalaxyMapPage() {
 
   const scrollToHome = useCallback(() => {
     if (!wrapRef.current) return
-    const clamped = clamp(HOME_X - wrapRef.current.clientWidth / 2, HOME_Y - wrapRef.current.clientHeight / 2)
+    const w = wrapRef.current.clientWidth
+    const h = wrapRef.current.clientHeight
+    const clamped = clamp(HOME_X - w / (2 * zoom), HOME_Y - h / (2 * zoom))
     setCamX(clamped.x)
     setCamY(clamped.y)
-  }, [clamp])
+  }, [clamp, zoom])
+
+  const onWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
+    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom + delta))
+    if (newZoom === zoom) return
+
+    const rect = wrapRef.current!.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left
+    const mouseY = e.clientY - rect.top
+    const canvasX = camX + mouseX / zoom
+    const canvasY = camY + mouseY / zoom
+    const newCamX = canvasX - mouseX / newZoom
+    const newCamY = canvasY - mouseY / newZoom
+    const clamped = clamp(newCamX, newCamY, newZoom)
+    setCamX(clamped.x)
+    setCamY(clamped.y)
+    setZoom(newZoom)
+  }, [zoom, camX, camY, clamp])
+
+  const zoomIn = useCallback(() => {
+    const newZoom = Math.min(MAX_ZOOM, zoom + ZOOM_STEP)
+    if (newZoom === zoom) return
+    const w = wrapRef.current?.clientWidth ?? 800
+    const h = wrapRef.current?.clientHeight ?? 600
+    const newCamX = camX + w * (1 / zoom - 1 / newZoom) / 2
+    const newCamY = camY + h * (1 / zoom - 1 / newZoom) / 2
+    const clamped = clamp(newCamX, newCamY, newZoom)
+    setCamX(clamped.x)
+    setCamY(clamped.y)
+    setZoom(newZoom)
+  }, [zoom, camX, camY, clamp])
+
+  const zoomOut = useCallback(() => {
+    const newZoom = Math.max(MIN_ZOOM, zoom - ZOOM_STEP)
+    if (newZoom === zoom) return
+    const w = wrapRef.current?.clientWidth ?? 800
+    const h = wrapRef.current?.clientHeight ?? 600
+    const newCamX = camX + w * (1 / zoom - 1 / newZoom) / 2
+    const newCamY = camY + h * (1 / zoom - 1 / newZoom) / 2
+    const clamped = clamp(newCamX, newCamY, newZoom)
+    setCamX(clamped.x)
+    setCamY(clamped.y)
+    setZoom(newZoom)
+  }, [zoom, camX, camY, clamp])
 
   const handleRunRadar = async () => {
     if (radarLevel < 1) return
@@ -612,13 +685,15 @@ export function GalaxyMapPage() {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
+        onWheel={onWheel}
       >
         <div
           className="absolute"
           style={{
             width: CANVAS_W,
             height: CANVAS_H,
-            transform: `translate(${-camX}px, ${-camY}px)`,
+            transform: `translate(${-camX * zoom}px, ${-camY * zoom}px) scale(${zoom})`,
+            transformOrigin: '0 0',
             background: `
               radial-gradient(ellipse at 35% 40%, rgba(99,102,241,0.04) 0%, transparent 50%),
               radial-gradient(ellipse at 70% 65%, rgba(168,85,247,0.03) 0%, transparent 45%),
@@ -717,6 +792,28 @@ export function GalaxyMapPage() {
           </div>
         )}
 
+        {/* Zoom controls */}
+        <div
+          data-clickable
+          className="absolute z-[31] flex flex-col gap-1"
+          style={{ right: '12px', bottom: selected ? '286px' : '144px' }}
+        >
+          <button
+            onClick={zoomIn}
+            disabled={zoom >= MAX_ZOOM}
+            className="w-7 h-7 flex items-center justify-center rounded bg-slate-900/80 border border-slate-700/20 text-slate-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-bold transition-colors"
+          >
+            +
+          </button>
+          <button
+            onClick={zoomOut}
+            disabled={zoom <= MIN_ZOOM}
+            className="w-7 h-7 flex items-center justify-center rounded bg-slate-900/80 border border-slate-700/20 text-slate-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-bold transition-colors"
+          >
+            −
+          </button>
+        </div>
+
         {/* Minimap */}
         <Minimap
           locations={visibleLocations}
@@ -725,7 +822,13 @@ export function GalaxyMapPage() {
           camY={camY}
           viewportW={wrapRef.current?.clientWidth ?? 800}
           viewportH={wrapRef.current?.clientHeight ?? 600}
+          zoom={zoom}
           onScrollHome={scrollToHome}
+          onMinimapClick={(x, y) => {
+            const clamped = clamp(x, y)
+            setCamX(clamped.x)
+            setCamY(clamped.y)
+          }}
           panelOpen={!!selected}
         />
 
