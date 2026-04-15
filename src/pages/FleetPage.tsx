@@ -3,10 +3,12 @@ import { useNavigate, useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { SHIPS } from '../config/ships'
 import { formatTime } from '../hooks/useConstructionQueue'
+import { getTechBonuses } from '../lib/techBonuses'
 import type { GameContext } from '../components/Layout'
 
 export function FleetPage() {
-  const { planet, shipFleet, activeShipBuild, shipBuildQueue, shipTimeRemaining, activeMissions, refetch } = useOutletContext<GameContext>()
+  const { planet, shipFleet, activeShipBuild, shipBuildQueue, shipTimeRemaining, activeMissions, refetch, technologies } = useOutletContext<GameContext>()
+  const techBonuses = getTechBonuses(technologies)
   const navigate = useNavigate()
 
   const fleetCounts = new Map(shipFleet.map((s) => [s.ship_type, s.count]))
@@ -23,8 +25,8 @@ export function FleetPage() {
   const totals = SHIPS.reduce(
     (acc, ship) => {
       const count = fleetCounts.get(ship.id) ?? 0
-      acc.attack += count * ship.stats.attackPower
-      acc.defense += count * ship.stats.defenseRating
+      acc.attack += count * Math.round(ship.stats.attackPower * (1 + techBonuses.ship_attack))
+      acc.defense += count * Math.round(ship.stats.defenseRating * (1 + techBonuses.ship_defense))
       acc.cargo += count * ship.stats.cargoCapacity
       acc.ships += count
       return acc
@@ -51,7 +53,7 @@ export function FleetPage() {
               const isActive = item.completes_at !== null
               return (
                 <div key={item.id} className="flex items-center gap-3">
-                  <span className="text-2xl">{ship?.icon}</span>
+                  <img src={ship?.image} alt={ship?.name} className="w-8 h-8 rounded object-cover" />
                   <div className="flex-1">
                     <div className="text-xs font-semibold text-slate-200">
                       {ship?.name} ×{item.quantity}
@@ -118,6 +120,8 @@ export function FleetPage() {
               planetId={planet.id}
               onScrap={refetch}
               onDeploy={() => navigate(`/missions?ship=${ship.id}`)}
+              attackBonus={techBonuses.ship_attack}
+              defenseBonus={techBonuses.ship_defense}
             />
           )
         })}
@@ -134,6 +138,8 @@ function ShipRow({
   planetId,
   onScrap,
   onDeploy,
+  attackBonus,
+  defenseBonus,
 }: {
   ship: (typeof SHIPS)[number]
   count: number
@@ -142,6 +148,8 @@ function ShipRow({
   planetId: string
   onScrap: () => Promise<void>
   onDeploy: () => void
+  attackBonus: number
+  defenseBonus: number
 }) {
   const [scrapping, setScrapping] = useState(false)
 
@@ -168,11 +176,28 @@ function ShipRow({
     <div className={`bg-slate-800/40 rounded-lg border border-slate-700/20 px-4 py-3 flex items-center gap-4 transition-opacity ${count === 0 ? 'opacity-40' : ''}`}>
       {/* Icon + Name */}
       <div className="flex items-center gap-3 min-w-[160px]">
-        <span className="text-2xl">{ship.icon}</span>
+        <img src={ship.image} alt={ship.name} className="w-10 h-10 rounded-md object-cover" />
         <div>
           <div className="text-sm font-semibold text-slate-200">{ship.name}</div>
-          <div className="text-[10px] text-slate-500">
-            Spd {ship.stats.speed} · Atk {ship.stats.attackPower} · Def {ship.stats.defenseRating} · Cargo {ship.stats.cargoCapacity.toLocaleString()}
+          <div className="text-[10px] text-slate-500 flex items-center gap-1 flex-wrap">
+            <span>Spd {ship.stats.speed}</span>
+            <span>·</span>
+            <span>
+              {attackBonus > 0.001 ? (
+                <>Atk <span className="line-through opacity-50">{ship.stats.attackPower}</span> <span className="text-slate-300">{Math.round(ship.stats.attackPower * (1 + attackBonus))}</span></>
+              ) : (
+                <>Atk {ship.stats.attackPower}</>
+              )}
+            </span>
+            <span>·</span>
+            <span>
+              {defenseBonus > 0.001 ? (
+                <>Def <span className="line-through opacity-50">{ship.stats.defenseRating}</span> <span className="text-slate-300">{Math.round(ship.stats.defenseRating * (1 + defenseBonus))}</span></>
+              ) : (
+                <>Def {ship.stats.defenseRating}</>
+              )}
+            </span>
+            <span>· Cargo {ship.stats.cargoCapacity.toLocaleString()}</span>
           </div>
         </div>
       </div>

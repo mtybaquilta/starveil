@@ -4,6 +4,7 @@ import { useOutletContext } from 'react-router-dom'
 import { SHIPS, getShipConfig } from '../config/ships'
 import { shipBuildTimeSeconds } from '../config/formulas'
 import { formatTime } from '../hooks/useConstructionQueue'
+import { getTechBonuses } from '../lib/techBonuses'
 import type { GameContext } from '../components/Layout'
 
 export function ShipyardPage() {
@@ -13,6 +14,7 @@ export function ShipyardPage() {
   const shipyardLevel = buildingLevels.get('shipyard') ?? 0
 
   const techLevels = new Map(technologies.map((t) => [t.tech_id, t.level]))
+  const techBonuses = getTechBonuses(technologies)
   const fleetCounts = new Map(shipFleet.map((s) => [s.ship_type, s.count]))
 
   if (shipyardLevel === 0) {
@@ -76,6 +78,8 @@ export function ShipyardPage() {
               fleetCount={fleetCount}
               metal={resources.metal}
               gas={resources.gas}
+              attackBonus={techBonuses.ship_attack}
+              defenseBonus={techBonuses.ship_defense}
               onBuild={() => startShipBuild(ship.id, 1)}
             />
           )
@@ -97,6 +101,8 @@ function ShipCard({
   fleetCount,
   metal,
   gas,
+  attackBonus,
+  defenseBonus,
   onBuild,
 }: {
   ship: ReturnType<typeof getShipConfig>
@@ -110,6 +116,8 @@ function ShipCard({
   fleetCount: number
   metal: number
   gas: number
+  attackBonus: number
+  defenseBonus: number
   onBuild: () => Promise<void> | void
 }) {
   const [building, setBuilding] = useState(false)
@@ -154,22 +162,10 @@ function ShipCard({
 
         {/* Stats — 4-column: label value | label value */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-          <div className="flex justify-between text-[11px]">
-            <span className="text-slate-500">Speed</span>
-            <span className="text-slate-200 font-medium">{ship.stats.speed}</span>
-          </div>
-          <div className="flex justify-between text-[11px]">
-            <span className="text-slate-500">Cargo</span>
-            <span className="text-slate-200 font-medium">{ship.stats.cargoCapacity.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between text-[11px]">
-            <span className="text-slate-500">Attack</span>
-            <span className="text-slate-200 font-medium">{ship.stats.attackPower}</span>
-          </div>
-          <div className="flex justify-between text-[11px]">
-            <span className="text-slate-500">Defense</span>
-            <span className="text-slate-200 font-medium">{ship.stats.defenseRating}</span>
-          </div>
+          <StatRow label="Speed" value={ship.stats.speed} />
+          <StatRow label="Cargo" value={ship.stats.cargoCapacity} />
+          <BoostedStatRow label="Attack" base={ship.stats.attackPower} bonus={attackBonus} />
+          <BoostedStatRow label="Defense" base={ship.stats.defenseRating} bonus={defenseBonus} />
         </div>
 
         {/* Cost */}
@@ -206,3 +202,32 @@ function ShipCard({
   )
 }
 
+function StatRow({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex justify-between text-[11px]">
+      <span className="text-slate-500">{label}</span>
+      <span className="text-slate-200 font-medium">{value.toLocaleString()}</span>
+    </div>
+  )
+}
+
+function BoostedStatRow({ label, base, bonus }: { label: string; base: number; bonus: number }) {
+  const boosted = Math.round(base * (1 + bonus))
+  const hasBonuses = bonus > 0.001
+  return (
+    <div className="flex justify-between text-[11px]">
+      <span className="text-slate-500">{label}</span>
+      <span className="text-slate-200 font-medium">
+        {hasBonuses ? (
+          <>
+            <span className="text-slate-600 line-through mr-1">{base}</span>
+            {boosted}
+            <span className="text-emerald-400 ml-1">(+{Math.round(bonus * 100)}%)</span>
+          </>
+        ) : (
+          base
+        )}
+      </span>
+    </div>
+  )
+}
