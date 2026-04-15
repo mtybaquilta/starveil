@@ -3,7 +3,24 @@ import { getBuildingConfig, BUILDINGS } from '../config/buildings'
 import { productionPerHour, upgradeCost, buildTimeSeconds, energyConsumption, storageCapacity } from '../config/formulas'
 import { formatTime } from '../hooks/useConstructionQueue'
 import { LevelProgression } from './LevelProgression'
-import type { PlanetBuilding, ConstructionItem } from '../hooks/usePlanet'
+import { ProductionBreakdown } from './ProductionBreakdown'
+import type { PlanetBuilding, ConstructionItem, PlanetWeather } from '../hooks/usePlanet'
+
+const WEATHER_NAMES: Record<string, string> = {
+  calm_skies: 'Calm Skies', solar_flare: 'Solar Flare', metal_vein: 'Metal Vein',
+  gas_pocket: 'Gas Pocket', ion_storm: 'Ion Storm', dust_storm: 'Dust Storm',
+  solar_storm: 'Solar Storm', asteroid_shower: 'Asteroid Shower', nebula_drift: 'Nebula Drift',
+}
+
+type ResourceSnapshot = {
+  metalResearchBonus: number
+  gasResearchBonus: number
+  energyResearchBonus: number
+  energyRatio: number
+  metalPerHour: number
+  gasPerHour: number
+  energyProduced: number
+}
 
 type Props = {
   buildingId: string
@@ -12,47 +29,13 @@ type Props = {
   gas: number
   activeBuild: ConstructionItem | null
   onStartBuild: (buildingId: string) => Promise<void>
-}
-
-const BUILDING_ICONS: Record<string, string> = {
-  headquarters: '🏛️',
-  metal_mine: '⛏️',
-  gas_refinery: '🔮',
-  solar_array: '⚡',
-  metal_storage: '🏭',
-  gas_storage: '🛢️',
-  weather_station: '🌤️',
-  research_lab: '🔬',
-  shipyard: '🚀',
-  perimeter_turret: '🔫',
-  ion_cannon: '⚡',
-  missile_battery: '🚀',
-  shield_generator: '🛡️',
-  sensor_jammer: '📡',
-  orbital_platform: '🛸',
-}
-
-const ICON_GRADIENTS: Record<string, string> = {
-  headquarters: 'from-slate-600 to-slate-800',
-  metal_mine: 'from-amber-800 to-amber-950',
-  gas_refinery: 'from-purple-800 to-purple-950',
-  solar_array: 'from-green-700 to-green-900',
-  metal_storage: 'from-blue-800 to-blue-950',
-  gas_storage: 'from-purple-700 to-purple-900',
-  weather_station: 'from-cyan-700 to-cyan-900',
-  research_lab: 'from-pink-800 to-pink-950',
-  shipyard: 'from-sky-700 to-sky-900',
-  perimeter_turret: 'from-red-800 to-red-950',
-  ion_cannon: 'from-yellow-700 to-yellow-900',
-  missile_battery: 'from-orange-800 to-orange-950',
-  shield_generator: 'from-emerald-700 to-emerald-900',
-  sensor_jammer: 'from-teal-700 to-teal-900',
-  orbital_platform: 'from-indigo-700 to-indigo-900',
+  resources: ResourceSnapshot
+  weather: PlanetWeather | null
 }
 
 const BASE_STORAGE = 10000
 
-export function BuildingDetail({ buildingId, buildings, metal, gas, activeBuild, onStartBuild }: Props) {
+export function BuildingDetail({ buildingId, buildings, metal, gas, activeBuild, onStartBuild, resources, weather }: Props) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -102,9 +85,7 @@ export function BuildingDetail({ buildingId, buildings, metal, gas, activeBuild,
 
       {/* Header */}
       <div className="flex gap-5 mb-6">
-        <div className={`w-28 h-28 rounded-xl bg-gradient-to-br ${ICON_GRADIENTS[buildingId] ?? 'from-slate-700 to-slate-900'} flex items-center justify-center text-5xl shrink-0`}>
-          {BUILDING_ICONS[buildingId] ?? '🏗️'}
-        </div>
+        <img src={config.image} alt={config.name} className="w-28 h-28 rounded-xl object-cover shrink-0" />
         <div className="flex-1">
           <div className="flex items-baseline gap-2.5">
             <h1 className="text-xl font-bold text-slate-100">{config.name}</h1>
@@ -112,12 +93,43 @@ export function BuildingDetail({ buildingId, buildings, metal, gas, activeBuild,
           </div>
           <p className="text-xs text-slate-400 leading-relaxed mt-2">{config.description}</p>
           <div className="flex gap-4 mt-3">
-            {config.baseProductionPerHour > 0 && (
-              <>
-                <StatBlock label="Current Output" value={`${Math.floor(currentProduction)}`} suffix="/hr" color="text-orange-400" />
+            {config.baseProductionPerHour > 0 && level > 0 && (
+              <div className="flex-1">
+                <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1.5">
+                  {buildingId === 'solar_array' ? 'Energy Output' : 'Current Output'}
+                </div>
+                <ProductionBreakdown
+                  baseRate={currentProduction}
+                  researchBonus={
+                    buildingId === 'metal_mine' ? resources.metalResearchBonus
+                    : buildingId === 'gas_refinery' ? resources.gasResearchBonus
+                    : buildingId === 'solar_array' ? resources.energyResearchBonus
+                    : 0
+                  }
+                  weatherMultiplier={
+                    buildingId === 'metal_mine' ? (weather ? Number(weather.metal_multiplier) : 1)
+                    : buildingId === 'gas_refinery' ? (weather ? Number(weather.gas_multiplier) : 1)
+                    : 1
+                  }
+                  weatherLabel={weather ? (WEATHER_NAMES[weather.weather_type] ?? weather.weather_type) : 'Calm Skies'}
+                  energyRatio={buildingId === 'solar_array' ? 1 : resources.energyRatio}
+                  effectiveRate={
+                    buildingId === 'metal_mine' ? resources.metalPerHour
+                    : buildingId === 'gas_refinery' ? resources.gasPerHour
+                    : resources.energyProduced
+                  }
+                  unit={buildingId === 'solar_array' ? '' : '/h'}
+                />
                 {!isMaxLevel && (
-                  <StatBlock label="Next Level" value={`${Math.floor(nextProduction)}`} suffix="/hr" color="text-green-400" />
+                  <div className="mt-2 text-[10px] text-green-400">
+                    Next level: {Math.floor(nextProduction)}{buildingId === 'solar_array' ? '' : '/h'}
+                  </div>
                 )}
+              </div>
+            )}
+            {config.baseProductionPerHour > 0 && level === 0 && (
+              <>
+                <StatBlock label="At Level 1" value={`${Math.floor(nextProduction)}`} suffix={buildingId === 'solar_array' ? '' : '/hr'} color="text-orange-400" />
               </>
             )}
             {config.category === 'storage' && level > 0 && (

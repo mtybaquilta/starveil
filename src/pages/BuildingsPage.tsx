@@ -33,7 +33,7 @@ function isBuildingUnlocked(
 
 export function BuildingsPage() {
   const { buildingId } = useParams()
-  const { buildings, resources, activeBuild, startBuild } = useOutletContext<GameContext>()
+  const { buildings, resources, weather, activeBuild, startBuild } = useOutletContext<GameContext>()
   const [selectedCategory, setSelectedCategory] = useState<BuildingCategory>('resource')
 
   const buildingLevels = new Map(buildings.map((b) => [b.building_id, b.level]))
@@ -47,6 +47,8 @@ export function BuildingsPage() {
         gas={resources.gas}
         activeBuild={activeBuild}
         onStartBuild={startBuild}
+        resources={resources}
+        weather={weather}
       />
     )
   }
