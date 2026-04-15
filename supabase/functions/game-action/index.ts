@@ -290,11 +290,36 @@ async function topUpDevResources(supabase: any, planetId: string) {
   }).eq('id', planetId)
 }
 
+function calcTechBonuses(technologies: { tech_id: string; level: number }[]): {
+  metal_production: number; gas_production: number; energy_production: number
+  ship_attack: number; ship_defense: number
+} {
+  const BONUS_STATS: Record<string, Record<string, number>> = {
+    'efficient_refining':  { metal_production: 5 },
+    'rapid_extraction':    { gas_production: 5 },
+    'solar_efficiency':    { energy_production: 5 },
+    'fusion_theory':       { energy_production: 8 },
+    'reinforced_hulls':    { ship_defense: 5 },
+    'advanced_weapons':    { ship_attack: 5 },
+  }
+  const result = { metal_production: 0, gas_production: 0, energy_production: 0, ship_attack: 0, ship_defense: 0 }
+  for (const { tech_id, level } of technologies) {
+    if (level <= 0) continue
+    const stats = BONUS_STATS[tech_id]
+    if (!stats) continue
+    for (const [stat, valuePerLevel] of Object.entries(stats)) {
+      result[stat as keyof typeof result] += (valuePerLevel / 100) * level
+    }
+  }
+  return result
+}
+
 // deno-lint-ignore no-explicit-any
 async function recalculateResources(supabase: any, planetId: string): Promise<{ metal: number; gas: number }> {
   const { data: planet } = await supabase.from('planets').select('metal_amount, gas_amount, last_calculated_at').eq('id', planetId).single()
   const { data: buildings } = await supabase.from('planet_buildings').select('building_id, level').eq('planet_id', planetId)
   const { data: weather } = await supabase.from('planet_weather').select('metal_multiplier, gas_multiplier, energy_multiplier, expires_at').eq('planet_id', planetId).order('started_at', { ascending: false }).limit(1).single()
+  const { data: techRows } = await supabase.from('planet_technologies').select('tech_id, level').eq('planet_id', planetId)
 
   const now = new Date()
   const elapsed = (now.getTime() - new Date(planet.last_calculated_at).getTime()) / (1000 * 3600)
@@ -314,6 +339,13 @@ async function recalculateResources(supabase: any, planetId: string): Promise<{ 
 
   totalMetalPerHour = Math.max(totalMetalPerHour, BASE_METAL_PRODUCTION)
   totalGasPerHour = Math.max(totalGasPerHour, BASE_GAS_PRODUCTION)
+
+  // Apply tech bonuses
+  const techBonuses = calcTechBonuses(techRows ?? [])
+  totalMetalPerHour *= (1 + techBonuses.metal_production)
+  totalGasPerHour *= (1 + techBonuses.gas_production)
+  totalEnergyProduced *= (1 + techBonuses.energy_production)
+
   const energyRatio = totalEnergyConsumed <= 0 ? 1 : Math.min(1, totalEnergyProduced / totalEnergyConsumed)
 
   const weatherActive = weather && (!weather.expires_at || new Date(weather.expires_at) > now)
