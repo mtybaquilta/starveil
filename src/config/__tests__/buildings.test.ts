@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { BUILDINGS, getBuildingConfig } from '../buildings'
 
 describe('BUILDINGS config', () => {
-  it('has 10 buildings', () => {
-    expect(BUILDINGS).toHaveLength(10)
+  it('has 16 buildings (10 standard + 6 defense)', () => {
+    expect(BUILDINGS).toHaveLength(16)
   })
 
   it('each building has required fields', () => {
@@ -15,7 +15,7 @@ describe('BUILDINGS config', () => {
       expect(b.baseCost.metal).toBeGreaterThanOrEqual(0)
       expect(b.baseCost.gas).toBeGreaterThanOrEqual(0)
       expect(b.baseBuildTimeSeconds).toBeGreaterThan(0)
-      expect(b.category).toMatch(/^(resource|storage|infrastructure)$/)
+      expect(b.category).toMatch(/^(resource|storage|infrastructure|defense)$/)
     }
   })
 
