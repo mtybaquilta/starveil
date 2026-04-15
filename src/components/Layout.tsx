@@ -15,7 +15,7 @@ export function Layout() {
     missions, completedMissions, galaxyMap, technologies, researchQueue,
     weather, events, loading, refetch,
   } = usePlanet()
-  const resources = useResources(planet, buildings, weather)
+  const resources = useResources(planet, buildings, weather, technologies)
   const { activeBuild, timeRemaining, startBuild } = useConstructionQueue(
     planet?.id,
     constructionQueue,
