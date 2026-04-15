@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import probeImg from '../assets/probe.png'
+import probeImg from '../assets/ships/probe.jpg'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 

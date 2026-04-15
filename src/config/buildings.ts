@@ -1,3 +1,20 @@
+import headquartersImg from '../assets/buildings/headquarters.jpg'
+import metalMineImg from '../assets/buildings/metal_mine.jpg'
+import gasRefineryImg from '../assets/buildings/gas_refinary.jpg'
+import solarArrayImg from '../assets/buildings/solar_array.jpg'
+import metalStorageImg from '../assets/buildings/metal_storage.jpg'
+import gasStorageImg from '../assets/buildings/gas_storage.jpg'
+import weatherStationImg from '../assets/buildings/weather_station.jpg'
+import researchLabImg from '../assets/buildings/research_lab.jpg'
+import radarArrayImg from '../assets/buildings/radar_array.jpg'
+import perimeterTurretImg from '../assets/defense/perimeter_turret.jpg'
+import ionCannonImg from '../assets/defense/ion_turret.jpg'
+import missileBatteryImg from '../assets/defense/missile_battery.jpg'
+import shieldGeneratorImg from '../assets/defense/shield_generator.jpg'
+import sensorJammerImg from '../assets/defense/jammer.jpg'
+import orbitalPlatformImg from '../assets/defense/orbital_platform.jpg'
+import shipyardImg from '../assets/ships/shipyard.jpg'
+
 export type BuildingCategory = 'resource' | 'storage' | 'infrastructure' | 'defense'
 
 export type BuildingConfig = {
@@ -27,7 +44,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 5,
     baseBuildTimeSeconds: 60,
     prerequisites: [],
-    image: '/images/buildings/headquarters.png',
+    image: headquartersImg,
   },
   {
     id: 'metal_mine',
@@ -40,7 +57,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 10,
     baseBuildTimeSeconds: 30,
     prerequisites: [],
-    image: '/images/buildings/metal_mine.png',
+    image: metalMineImg,
   },
   {
     id: 'gas_refinery',
@@ -53,7 +70,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 12,
     baseBuildTimeSeconds: 45,
     prerequisites: [{ buildingId: 'headquarters', level: 2 }],
-    image: '/images/buildings/gas_refinery.png',
+    image: gasRefineryImg,
   },
   {
     id: 'solar_array',
@@ -66,7 +83,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 0,
     baseBuildTimeSeconds: 30,
     prerequisites: [],
-    image: '/images/buildings/solar_array.png',
+    image: solarArrayImg,
   },
   {
     id: 'metal_storage',
@@ -79,7 +96,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 3,
     baseBuildTimeSeconds: 40,
     prerequisites: [{ buildingId: 'metal_mine', level: 2 }],
-    image: '/images/buildings/metal_storage.png',
+    image: metalStorageImg,
   },
   {
     id: 'gas_storage',
@@ -92,7 +109,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 3,
     baseBuildTimeSeconds: 40,
     prerequisites: [{ buildingId: 'gas_refinery', level: 2 }],
-    image: '/images/buildings/gas_storage.png',
+    image: gasStorageImg,
   },
   {
     id: 'weather_station',
@@ -105,7 +122,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 8,
     baseBuildTimeSeconds: 50,
     prerequisites: [{ buildingId: 'headquarters', level: 2 }],
-    image: '/images/buildings/weather_station.png',
+    image: weatherStationImg,
   },
   {
     id: 'research_lab',
@@ -118,7 +135,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 15,
     baseBuildTimeSeconds: 90,
     prerequisites: [{ buildingId: 'headquarters', level: 3 }],
-    image: '/images/buildings/research_lab.png',
+    image: researchLabImg,
   },
   {
     id: 'shipyard',
@@ -131,7 +148,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 20,
     baseBuildTimeSeconds: 120,
     prerequisites: [{ buildingId: 'headquarters', level: 2 }],
-    image: '/images/buildings/shipyard.png',
+    image: shipyardImg,
   },
   {
     id: 'radar_array',
@@ -144,7 +161,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 18,
     baseBuildTimeSeconds: 90,
     prerequisites: [{ buildingId: 'headquarters', level: 3 }],
-    image: '/images/buildings/radar_array.png',
+    image: radarArrayImg,
   },
   // Defense structures
   {
@@ -158,7 +175,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 8,
     baseBuildTimeSeconds: 45,
     prerequisites: [{ buildingId: 'headquarters', level: 2 }],
-    image: '/images/buildings/perimeter_turret.png',
+    image: perimeterTurretImg,
     defenseRating: 10,
   },
   {
@@ -172,7 +189,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 25,
     baseBuildTimeSeconds: 120,
     prerequisites: [{ buildingId: 'headquarters', level: 4 }, { buildingId: 'research_lab', level: 2 }],
-    image: '/images/buildings/ion_cannon.png',
+    image: ionCannonImg,
     defenseRating: 25,
   },
   {
@@ -186,7 +203,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 15,
     baseBuildTimeSeconds: 90,
     prerequisites: [{ buildingId: 'headquarters', level: 3 }, { buildingId: 'perimeter_turret', level: 3 }],
-    image: '/images/buildings/missile_battery.png',
+    image: missileBatteryImg,
     defenseRating: 18,
   },
   {
@@ -200,7 +217,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 30,
     baseBuildTimeSeconds: 150,
     prerequisites: [{ buildingId: 'headquarters', level: 5 }, { buildingId: 'research_lab', level: 3 }],
-    image: '/images/buildings/shield_generator.png',
+    image: shieldGeneratorImg,
     defenseRating: 30,
   },
   {
@@ -214,7 +231,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 10,
     baseBuildTimeSeconds: 75,
     prerequisites: [{ buildingId: 'headquarters', level: 4 }],
-    image: '/images/buildings/sensor_jammer.png',
+    image: sensorJammerImg,
     defenseRating: 12,
   },
   {
@@ -228,7 +245,7 @@ export const BUILDINGS: BuildingConfig[] = [
     baseEnergyConsumption: 40,
     baseBuildTimeSeconds: 200,
     prerequisites: [{ buildingId: 'headquarters', level: 7 }, { buildingId: 'ion_cannon', level: 5 }],
-    image: '/images/buildings/orbital_platform.png',
+    image: orbitalPlatformImg,
     defenseRating: 50,
   },
 ]

@@ -1,0 +1,151 @@
+<h2>Fleet Page Redesign — Layout Direction</h2>
+<p class="subtitle">Which overall structure feels right for the Fleet page?</p>
+
+<div class="cards">
+  <!-- Option A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #0a0e1a;">
+      <div style="font-family: system-ui, sans-serif; color: #e2e8f0; font-size: 11px;">
+        <!-- Fleet Power Banner -->
+        <div style="background: linear-gradient(135deg, #1e1b4b, #0f172a); border: 1px solid rgba(99,102,241,0.2); border-radius: 10px; padding: 14px 18px; margin-bottom: 12px;">
+          <div style="font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Fleet Power</div>
+          <div style="display: flex; gap: 20px;">
+            <div>
+              <div style="font-size: 18px; font-weight: 800; color: #f97316;">247</div>
+              <div style="font-size: 8px; color: #94a3b8;">Total Attack</div>
+            </div>
+            <div>
+              <div style="font-size: 18px; font-weight: 800; color: #3b82f6;">183</div>
+              <div style="font-size: 8px; color: #94a3b8;">Total Defense</div>
+            </div>
+            <div>
+              <div style="font-size: 18px; font-weight: 800; color: #a855f7;">12,400</div>
+              <div style="font-size: 8px; color: #94a3b8;">Cargo Cap.</div>
+            </div>
+            <div>
+              <div style="font-size: 18px; font-weight: 800; color: #22c55e;">14</div>
+              <div style="font-size: 8px; color: #94a3b8;">Ships</div>
+            </div>
+          </div>
+        </div>
+        <!-- Ship Cards -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; color: #e2e8f0;">Scout</span>
+              <span style="font-size: 16px; font-weight: 800; color: #e2e8f0;">5</span>
+            </div>
+            <div style="font-size: 8px; color: #64748b; margin-top: 2px;">3 available · 2 deployed</div>
+            <div style="display: flex; gap: 4px; margin-top: 8px;">
+              <div style="flex:1; padding: 4px; text-align: center; background: #ef4444/15; border: 1px solid rgba(239,68,68,0.3); border-radius: 4px; color: #fca5a5; font-size: 8px; cursor: pointer;">Scrap 1</div>
+              <div style="flex:1; padding: 4px; text-align: center; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); border-radius: 4px; color: #a5b4fc; font-size: 8px; cursor: pointer;">Deploy →</div>
+            </div>
+          </div>
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; color: #e2e8f0;">Fighter</span>
+              <span style="font-size: 16px; font-weight: 800; color: #e2e8f0;">4</span>
+            </div>
+            <div style="font-size: 8px; color: #64748b; margin-top: 2px;">4 available · 0 deployed</div>
+            <div style="display: flex; gap: 4px; margin-top: 8px;">
+              <div style="flex:1; padding: 4px; text-align: center; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); border-radius: 4px; color: #fca5a5; font-size: 8px;">Scrap 1</div>
+              <div style="flex:1; padding: 4px; text-align: center; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); border-radius: 4px; color: #a5b4fc; font-size: 8px;">Deploy →</div>
+            </div>
+          </div>
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; color: #e2e8f0;">Transport</span>
+              <span style="font-size: 16px; font-weight: 800; color: #e2e8f0;">3</span>
+            </div>
+            <div style="font-size: 8px; color: #64748b; margin-top: 2px;">1 available · 2 deployed</div>
+            <div style="display: flex; gap: 4px; margin-top: 8px;">
+              <div style="flex:1; padding: 4px; text-align: center; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); border-radius: 4px; color: #fca5a5; font-size: 8px;">Scrap 1</div>
+              <div style="flex:1; padding: 4px; text-align: center; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); border-radius: 4px; color: #a5b4fc; font-size: 8px;">Deploy →</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A: Power Banner + Compact Cards</h3>
+      <p>Fleet power summary at the top with aggregate stats. Ship cards below are compact — count, availability, and inline Scrap/Deploy buttons. Cards use the same 3-column grid as Shipyard but are shorter (no images, no stats table). Deploy navigates to Missions with the ship pre-selected.</p>
+    </div>
+  </div>
+
+  <!-- Option B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #0a0e1a;">
+      <div style="font-family: system-ui, sans-serif; color: #e2e8f0; font-size: 11px;">
+        <!-- Fleet Power Banner -->
+        <div style="background: linear-gradient(135deg, #1e1b4b, #0f172a); border: 1px solid rgba(99,102,241,0.2); border-radius: 10px; padding: 14px 18px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Fleet Power</div>
+              <div style="display: flex; gap: 16px; margin-top: 6px;">
+                <div><span style="font-weight: 800; color: #f97316;">247</span> <span style="font-size: 8px; color: #94a3b8;">atk</span></div>
+                <div><span style="font-weight: 800; color: #3b82f6;">183</span> <span style="font-size: 8px; color: #94a3b8;">def</span></div>
+                <div><span style="font-weight: 800; color: #a855f7;">12.4k</span> <span style="font-size: 8px; color: #94a3b8;">cargo</span></div>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 28px; font-weight: 800; color: #e2e8f0;">14</div>
+              <div style="font-size: 8px; color: #64748b;">total ships</div>
+            </div>
+          </div>
+        </div>
+        <!-- Ship Rows (list) -->
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; background: #334155; border-radius: 6px; display: flex; align-items: center; justify-content: center;">🛸</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 700;">Scout</div>
+              <div style="font-size: 8px; color: #64748b;">Spd 8 · Atk 5 · Def 3 · Cargo 200</div>
+            </div>
+            <div style="text-align: center; min-width: 50px;">
+              <div style="font-size: 16px; font-weight: 800;">3<span style="color: #64748b; font-size: 10px;">/5</span></div>
+              <div style="font-size: 7px; color: #818cf8;">2 deployed</div>
+            </div>
+            <div style="display: flex; gap: 4px;">
+              <div style="padding: 5px 10px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); border-radius: 5px; color: #fca5a5; font-size: 9px;">Scrap</div>
+              <div style="padding: 5px 10px; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); border-radius: 5px; color: #a5b4fc; font-size: 9px;">Deploy →</div>
+            </div>
+          </div>
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; background: #334155; border-radius: 6px; display: flex; align-items: center; justify-content: center;">⚔️</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 700;">Small Fighter</div>
+              <div style="font-size: 8px; color: #64748b;">Spd 6 · Atk 15 · Def 10 · Cargo 100</div>
+            </div>
+            <div style="text-align: center; min-width: 50px;">
+              <div style="font-size: 16px; font-weight: 800;">4<span style="color: #64748b; font-size: 10px;">/4</span></div>
+              <div style="font-size: 7px; color: #22c55e;">all home</div>
+            </div>
+            <div style="display: flex; gap: 4px;">
+              <div style="padding: 5px 10px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); border-radius: 5px; color: #fca5a5; font-size: 9px;">Scrap</div>
+              <div style="padding: 5px 10px; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); border-radius: 5px; color: #a5b4fc; font-size: 9px;">Deploy →</div>
+            </div>
+          </div>
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; background: #334155; border-radius: 6px; display: flex; align-items: center; justify-content: center;">🚀</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 700;">Transport</div>
+              <div style="font-size: 8px; color: #64748b;">Spd 4 · Atk 2 · Def 8 · Cargo 5000</div>
+            </div>
+            <div style="text-align: center; min-width: 50px;">
+              <div style="font-size: 16px; font-weight: 800;">1<span style="color: #64748b; font-size: 10px;">/3</span></div>
+              <div style="font-size: 7px; color: #818cf8;">2 deployed</div>
+            </div>
+            <div style="display: flex; gap: 4px;">
+              <div style="padding: 5px 10px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); border-radius: 5px; color: #fca5a5; font-size: 9px;">Scrap</div>
+              <div style="padding: 5px 10px; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); border-radius: 5px; color: #a5b4fc; font-size: 9px;">Deploy →</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B: Power Banner + List Rows</h3>
+      <p>Same power summary at top but ships are shown as horizontal rows instead of cards. Each row shows the ship icon, name, inline stats, available/total count, deployment status, and action buttons. More information-dense — you can see everything at a glance without scrolling. Visually distinct from the Shipyard's card grid.</p>
+    </div>
+  </div>
+</div>

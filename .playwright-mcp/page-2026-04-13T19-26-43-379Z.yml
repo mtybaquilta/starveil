@@ -1,0 +1,79 @@
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6]: "STARVEIL: Intestellar Siege"
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e10]: 13,382
+        - generic [ref=e11]: +680/h
+        - generic [ref=e12]: Metal
+      - generic [ref=e13]:
+        - generic [ref=e15]: 4,633
+        - generic [ref=e16]: +69/h
+        - generic [ref=e17]: Gas
+      - generic [ref=e18]:
+        - generic [ref=e20]: 784/897
+        - generic [ref=e21]: energy
+    - generic [ref=e22]:
+      - generic [ref=e23]: 🔆 Solar Flare1h 6m
+      - generic [ref=e24]: Homeworld · 1:402:10
+  - generic [ref=e25]:
+    - generic [ref=e26]:
+      - navigation [ref=e27]:
+        - link "Overview" [ref=e28] [cursor=pointer]:
+          - /url: /
+        - link "Buildings" [ref=e29] [cursor=pointer]:
+          - /url: /buildings
+        - link "Resources" [ref=e30] [cursor=pointer]:
+          - /url: /resources
+        - link "Shipyard" [ref=e31] [cursor=pointer]:
+          - /url: /shipyard
+        - link "Fleet" [ref=e32] [cursor=pointer]:
+          - /url: /fleet
+        - link "Galaxy Map" [ref=e33] [cursor=pointer]:
+          - /url: /galaxy
+        - link "Missions" [ref=e34] [cursor=pointer]:
+          - /url: /missions
+        - link "Research" [ref=e35] [cursor=pointer]:
+          - /url: /research
+        - link "Inbox" [ref=e36] [cursor=pointer]:
+          - /url: /inbox
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - generic [ref=e39]: Construction
+          - generic [ref=e40]: No active build
+        - button "Sign Out" [ref=e42]
+    - main [ref=e43]:
+      - generic [ref=e44]:
+        - heading "Buildings" [level=1] [ref=e45]
+        - paragraph [ref=e46]: Construct and upgrade your colony infrastructure
+        - generic [ref=e47]:
+          - button "Resource" [ref=e48]
+          - button "Storage" [ref=e49]
+          - button "Infrastructure" [ref=e50]
+          - button "Defense" [active] [ref=e51]
+        - generic [ref=e52]:
+          - link "🔫 Perimeter Turret Not built" [ref=e65] [cursor=pointer]:
+            - /url: /buildings/perimeter_turret
+            - generic [ref=e66]: 🔫
+            - generic [ref=e67]: Perimeter Turret
+            - generic [ref=e68]: Not built
+          - generic [ref=e69]:
+            - generic [ref=e70]: ⚡
+            - generic [ref=e71]: Ion Cannon
+            - generic [ref=e72]: Requires Headquarters Lv.4
+          - generic [ref=e73]:
+            - generic [ref=e74]: 🚀
+            - generic [ref=e75]: Missile Battery
+            - generic [ref=e76]: Requires Perimeter Turret Lv.3
+          - generic [ref=e77]:
+            - generic [ref=e78]: 🛡️
+            - generic [ref=e79]: Shield Generator
+            - generic [ref=e80]: Requires Headquarters Lv.5
+          - generic [ref=e81]:
+            - generic [ref=e82]: 📡
+            - generic [ref=e83]: Sensor Jammer
+            - generic [ref=e84]: Requires Headquarters Lv.4
+          - generic [ref=e85]:
+            - generic [ref=e86]: 🛸
+            - generic [ref=e87]: Orbital Platform
+            - generic [ref=e88]: Requires Headquarters Lv.7

@@ -9,28 +9,10 @@ type Props = {
   prerequisiteText?: string
 }
 
-const BUILDING_ICONS: Record<string, string> = {
-  headquarters: '🏛️',
-  metal_mine: '⛏️',
-  gas_refinery: '🔮',
-  solar_array: '⚡',
-  metal_storage: '🏭',
-  gas_storage: '🛢️',
-  weather_station: '🌤️',
-  research_lab: '🔬',
-  perimeter_turret: '🔫',
-  ion_cannon: '⚡',
-  missile_battery: '🚀',
-  shield_generator: '🛡️',
-  sensor_jammer: '📡',
-  orbital_platform: '🛸',
-}
-
 const BASE_STORAGE = 10000
 
 export function BuildingCard({ buildingId, level, isUnlocked, prerequisiteText }: Props) {
   const config = getBuildingConfig(buildingId)
-  const icon = BUILDING_ICONS[buildingId] ?? '🏗️'
 
   let statText = ''
   if (config.category === 'resource' && level > 0) {
@@ -52,12 +34,12 @@ export function BuildingCard({ buildingId, level, isUnlocked, prerequisiteText }
 
   if (!isUnlocked) {
     return (
-      <div className="p-3.5 bg-slate-800/20 rounded-lg border border-dashed border-slate-700/30">
-        <div className="w-10 h-10 rounded-md bg-slate-800/50 flex items-center justify-center text-lg opacity-40 mb-2">
-          {icon}
+      <div className="bg-slate-800/20 rounded-xl border border-dashed border-slate-700/30 overflow-hidden">
+        <img src={config.image} alt={config.name} className="w-full h-32 object-cover opacity-30 grayscale" />
+        <div className="px-4 py-3">
+          <div className="text-xs font-semibold text-slate-600">{config.name}</div>
+          <div className="text-[10px] text-slate-700">{prerequisiteText}</div>
         </div>
-        <div className="text-xs font-semibold text-slate-600">{config.name}</div>
-        <div className="text-[10px] text-slate-700">{prerequisiteText}</div>
       </div>
     )
   }
@@ -65,14 +47,14 @@ export function BuildingCard({ buildingId, level, isUnlocked, prerequisiteText }
   return (
     <Link
       to={`/buildings/${buildingId}`}
-      className="block p-3.5 bg-slate-800/40 rounded-lg border border-slate-700/10 hover:border-slate-600/30 hover:bg-slate-800/60 transition-colors"
+      className="block bg-slate-800/40 rounded-xl border border-slate-700/20 hover:border-slate-600/30 hover:bg-slate-800/60 transition-colors overflow-hidden"
     >
-      <div className="w-10 h-10 rounded-md bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-lg mb-2">
-        {icon}
-      </div>
-      <div className="text-xs font-semibold text-slate-200">{config.name}</div>
-      <div className="text-[10px] text-slate-500">
-        {level === 0 ? 'Not built' : `Level ${level} · ${statText}`}
+      <img src={config.image} alt={config.name} className="w-full h-32 object-cover" />
+      <div className="px-4 py-3">
+        <div className="text-sm font-semibold text-slate-200">{config.name}</div>
+        <div className="text-[10px] text-slate-500">
+          {level === 0 ? 'Not built' : `Level ${level} · ${statText}`}
+        </div>
       </div>
     </Link>
   )

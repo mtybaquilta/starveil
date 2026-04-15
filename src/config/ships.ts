@@ -1,10 +1,12 @@
-import probeImg from '../assets/probe.png'
-import smallFighterImg from '../assets/small_fighter.png'
-import largeFighterImg from '../assets/large_fighter.png'
-import cruiserImg from '../assets/cruiser.png'
-import gunshipImg from '../assets/gunship.png'
-import destroyerImg from '../assets/destroyer.png'
-import harvesterImg from '../assets/harvester.png'
+import probeImg from '../assets/ships/probe.jpg'
+import smallFighterImg from '../assets/ships/small_fighter.jpg'
+import largeFighterImg from '../assets/ships/large_fighter.jpg'
+import cruiserImg from '../assets/ships/cruiser.jpg'
+import gunshipImg from '../assets/ships/gunship.jpg'
+import destroyerImg from '../assets/ships/destroyer.jpg'
+import harvesterImg from '../assets/ships/harvester.jpg'
+import smallCargoImg from '../assets/ships/small_cargo.jpg'
+import largeCargoImg from '../assets/ships/large_cargo.jpg'
 
 export type ShipId =
   | 'probe'
@@ -119,7 +121,7 @@ export const SHIPS: ShipConfig[] = [
     baseBuildTimeSeconds: 300,
     stats: { speed: 8, cargoCapacity: 2000, attackPower: 1, defenseRating: 8, miningYield: 0 },
     requiredShipyardLevel: 2,
-    image: harvesterImg,
+    image: smallCargoImg,
     icon: '📦',
   },
   {
@@ -130,7 +132,7 @@ export const SHIPS: ShipConfig[] = [
     baseBuildTimeSeconds: 900,
     stats: { speed: 5, cargoCapacity: 10000, attackPower: 2, defenseRating: 15, miningYield: 0 },
     requiredShipyardLevel: 5,
-    image: harvesterImg,
+    image: largeCargoImg,
     icon: '🚢',
   },
 ]

@@ -1,0 +1,134 @@
+<h2>Galaxy Map: Horizontal Space View</h2>
+<p class="subtitle">Your home planet at center, discovered locations spread left and right. Click one to see which direction feels right.</p>
+
+<div class="cards">
+  <!-- Option A: Panoramic belt -->
+  <div class="card" data-choice="panoramic" onclick="toggleSelect(this)" style="width:100%;">
+    <div class="card-image" style="background: linear-gradient(180deg, #05050f 0%, #0a0a1a 40%, #0f0a1a 100%); padding: 0; min-height: 320px; position: relative; overflow: hidden;">
+      <!-- Nebula glow -->
+      <div style="position:absolute;inset:0;background: radial-gradient(ellipse at 50% 60%, rgba(99,102,241,0.08) 0%, transparent 60%);"></div>
+      <!-- Stars -->
+      <div style="position:absolute;inset:0;background-image: radial-gradient(1px 1px at 5% 15%, rgba(255,255,255,0.6) 0%, transparent 100%), radial-gradient(1px 1px at 12% 70%, rgba(255,255,255,0.3) 0%, transparent 100%), radial-gradient(1px 1px at 25% 30%, rgba(255,255,255,0.4) 0%, transparent 100%), radial-gradient(1.5px 1.5px at 35% 80%, rgba(255,255,255,0.5) 0%, transparent 100%), radial-gradient(1px 1px at 45% 10%, rgba(255,255,255,0.3) 0%, transparent 100%), radial-gradient(1px 1px at 60% 45%, rgba(255,255,255,0.4) 0%, transparent 100%), radial-gradient(1px 1px at 72% 20%, rgba(255,255,255,0.5) 0%, transparent 100%), radial-gradient(1px 1px at 82% 65%, rgba(255,255,255,0.3) 0%, transparent 100%), radial-gradient(1px 1px at 92% 35%, rgba(255,255,255,0.4) 0%, transparent 100%), radial-gradient(1px 1px at 18% 50%, rgba(255,255,255,0.3) 0%, transparent 100%), radial-gradient(1.5px 1.5px at 55% 75%, rgba(255,255,255,0.4) 0%, transparent 100%), radial-gradient(1px 1px at 88% 85%, rgba(255,255,255,0.3) 0%, transparent 100%);"></div>
+
+      <!-- Horizontal lane area -->
+      <div style="position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); height:180px; display:flex; align-items:center; justify-content:center; gap:0;">
+
+        <!-- Far left: Detected signal -->
+        <div style="position:absolute; left:3%; display:flex;flex-direction:column;align-items:center;gap:6px; cursor:pointer;">
+          <div style="width:40px;height:40px;border-radius:50%;border:1.5px dashed rgba(234,179,8,0.4);display:flex;align-items:center;justify-content:center;background:rgba(234,179,8,0.05);">
+            <span style="font-size:18px;color:rgba(234,179,8,0.6);font-weight:bold;">?</span>
+          </div>
+          <span style="font-size:9px;color:rgba(234,179,8,0.5);font-family:monospace;">1:2:1</span>
+        </div>
+
+        <!-- Left: Debris field -->
+        <div style="position:absolute; left:14%; display:flex;flex-direction:column;align-items:center;gap:6px; cursor:pointer;">
+          <div style="width:56px;height:56px;border-radius:8px;background:linear-gradient(135deg,rgba(71,85,105,0.3),rgba(30,41,59,0.5));border:1px solid rgba(148,163,184,0.15);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+            <div style="width:22px;height:12px;background:linear-gradient(135deg,#64748b,#475569);border-radius:2px;transform:rotate(20deg);position:absolute;top:14px;left:8px;"></div>
+            <div style="width:14px;height:8px;background:linear-gradient(135deg,#94a3b8,#64748b);border-radius:1px;position:absolute;bottom:12px;right:10px;transform:rotate(-10deg);"></div>
+            <div style="width:8px;height:6px;background:#475569;border-radius:1px;position:absolute;top:22px;right:14px;transform:rotate(35deg);"></div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:10px;font-weight:600;color:#94a3b8;">Wreckage Field</div>
+            <div style="font-size:8px;color:#475569;">Debris</div>
+          </div>
+        </div>
+
+        <!-- Left-center: Asteroid field -->
+        <div style="position:absolute; left:30%; display:flex;flex-direction:column;align-items:center;gap:6px; cursor:pointer;">
+          <div style="width:60px;height:60px;border-radius:8px;background:linear-gradient(135deg,rgba(120,113,108,0.2),rgba(68,64,60,0.3));border:1px solid rgba(245,158,11,0.2);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+            <div style="width:26px;height:18px;background:radial-gradient(ellipse,#78716c 0%,#44403c 70%);border-radius:40%;transform:rotate(-10deg);"></div>
+            <div style="width:14px;height:10px;background:radial-gradient(ellipse,#a8a29e 0%,#57534e 70%);border-radius:40%;position:absolute;top:10px;right:8px;transform:rotate(15deg);"></div>
+            <div style="width:8px;height:6px;background:#78716c;border-radius:50%;position:absolute;bottom:12px;left:12px;"></div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:10px;font-weight:600;color:#f59e0b;">Alpha Belt</div>
+            <div style="font-size:8px;color:#92400e;">Asteroid Field</div>
+          </div>
+        </div>
+
+        <!-- CENTER: Home planet -->
+        <div style="position:absolute; left:50%; transform:translateX(-50%); display:flex;flex-direction:column;align-items:center;gap:8px; z-index:10;">
+          <!-- Orbit ring -->
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);width:110px;height:110px;border-radius:50%;border:1px solid rgba(99,102,241,0.12);"></div>
+          <!-- Planet -->
+          <div style="width:80px;height:80px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #6366f1 0%, #3730a3 40%, #1e1b4b 80%);box-shadow:0 0 40px rgba(99,102,241,0.3), inset -8px -8px 20px rgba(0,0,0,0.4);position:relative;overflow:hidden;">
+            <!-- Surface details -->
+            <div style="position:absolute;width:20px;height:8px;background:rgba(129,140,248,0.3);border-radius:50%;top:25%;left:20%;transform:rotate(-20deg);"></div>
+            <div style="position:absolute;width:30px;height:10px;background:rgba(99,102,241,0.2);border-radius:50%;top:55%;left:35%;transform:rotate(10deg);"></div>
+            <div style="position:absolute;width:14px;height:6px;background:rgba(165,180,252,0.2);border-radius:50%;top:40%;left:55%;"></div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:12px;font-weight:700;color:#a5b4fc;">Home Planet</div>
+            <div style="font-size:9px;color:#6366f1;font-family:monospace;">1:3:5</div>
+          </div>
+          <!-- Home indicator -->
+          <div style="position:absolute;top:-16px;font-size:8px;color:rgba(99,102,241,0.6);letter-spacing:2px;text-transform:uppercase;">HOME</div>
+        </div>
+
+        <!-- Right-center: Bandit camp -->
+        <div style="position:absolute; right:28%; display:flex;flex-direction:column;align-items:center;gap:6px; cursor:pointer;">
+          <div style="width:60px;height:60px;border-radius:8px;background:linear-gradient(135deg,rgba(127,29,29,0.25),rgba(69,10,10,0.3));border:1px solid rgba(239,68,68,0.25);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+            <!-- Station shape -->
+            <div style="width:28px;height:28px;background:linear-gradient(135deg,#374151,#1f2937);border-radius:3px;transform:rotate(45deg);border:1px solid rgba(239,68,68,0.3);"></div>
+            <div style="position:absolute;width:6px;height:6px;border-radius:50%;background:#ef4444;top:16px;left:50%;transform:translateX(-50%);box-shadow:0 0 8px rgba(239,68,68,0.6);"></div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:10px;font-weight:600;color:#ef4444;">Raider Base</div>
+            <div style="font-size:8px;color:#991b1b;">Bandit Camp</div>
+          </div>
+        </div>
+
+        <!-- Right: Another asteroid -->
+        <div style="position:absolute; right:12%; display:flex;flex-direction:column;align-items:center;gap:6px; cursor:pointer;">
+          <div style="width:52px;height:52px;border-radius:8px;background:linear-gradient(135deg,rgba(120,113,108,0.15),rgba(68,64,60,0.25));border:1px solid rgba(245,158,11,0.15);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+            <div style="width:22px;height:16px;background:radial-gradient(ellipse,#78716c 0%,#44403c 70%);border-radius:40%;transform:rotate(5deg);"></div>
+            <div style="width:10px;height:8px;background:#57534e;border-radius:40%;position:absolute;top:10px;right:10px;"></div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:10px;font-weight:600;color:#f59e0b;">Gamma Ridge</div>
+            <div style="font-size:8px;color:#92400e;">Asteroid Field</div>
+          </div>
+        </div>
+
+        <!-- Far right: Detected -->
+        <div style="position:absolute; right:2%; display:flex;flex-direction:column;align-items:center;gap:6px; cursor:pointer;">
+          <div style="width:40px;height:40px;border-radius:50%;border:1.5px dashed rgba(234,179,8,0.4);display:flex;align-items:center;justify-content:center;background:rgba(234,179,8,0.05);">
+            <span style="font-size:18px;color:rgba(234,179,8,0.6);font-weight:bold;">?</span>
+          </div>
+          <span style="font-size:9px;color:rgba(234,179,8,0.5);font-family:monospace;">1:4:2</span>
+        </div>
+
+      </div>
+
+      <!-- Scroll hint arrows -->
+      <div style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:rgba(148,163,184,0.2);font-size:20px;">&#8249;</div>
+      <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);color:rgba(148,163,184,0.2);font-size:20px;">&#8250;</div>
+
+      <!-- Bottom: coordinate ruler -->
+      <div style="position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:space-between;padding:0 16px;">
+        <span style="font-size:7px;color:rgba(100,116,139,0.3);font-family:monospace;">1:2:1</span>
+        <span style="font-size:7px;color:rgba(100,116,139,0.3);font-family:monospace;">1:2:5</span>
+        <span style="font-size:7px;color:rgba(100,116,139,0.4);font-family:monospace;">1:3:5 (HOME)</span>
+        <span style="font-size:7px;color:rgba(100,116,139,0.3);font-family:monospace;">1:4:2</span>
+        <span style="font-size:7px;color:rgba(100,116,139,0.3);font-family:monospace;">1:4:8</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Horizontal Space Panorama</h3>
+      <p>Your planet sits at the center, locations spread along a horizontal belt. Scrollable left/right to see more of the galaxy. Each location is a styled tile with CSS illustrations. Detected signals show as pulsing "?" circles. Clicking a location opens the detail panel below.</p>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:24px;padding:16px;background:rgba(30,41,59,0.3);border-radius:8px;border:1px solid rgba(71,85,105,0.2);">
+  <h3 style="margin:0 0 8px;font-size:14px;color:#e2e8f0;">Key Ideas</h3>
+  <ul style="margin:0;padding-left:20px;font-size:12px;color:#94a3b8;line-height:1.8;">
+    <li><strong style="color:#a5b4fc;">Home planet</strong> is always visible at center with an orbital ring glow</li>
+    <li><strong style="color:#f59e0b;">Asteroid fields</strong> show CSS rock shapes, <strong style="color:#ef4444;">bandit camps</strong> show a station, <strong style="color:#94a3b8;">debris</strong> shows metal fragments</li>
+    <li><strong style="color:rgba(234,179,8,0.7);">Detected signals</strong> are dashed circles with pulsing "?" — not yet revealed</li>
+    <li><strong>Scrollable</strong> horizontally as you discover more coordinates</li>
+    <li>Clicking a location opens a <strong>detail panel below</strong> (same actions: send probe, view info)</li>
+    <li><strong>Cleared</strong> locations fade to low opacity with a "CLEARED" badge</li>
+  </ul>
+</div>

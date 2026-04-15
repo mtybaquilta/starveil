@@ -1,0 +1,157 @@
+<h2>Galaxy Map: Visual Direction</h2>
+<p class="subtitle">Which style feels right for exploring the galaxy in StarVeil?</p>
+
+<div class="cards">
+  <!-- Option A: Spatial star map -->
+  <div class="card" data-choice="spatial" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: radial-gradient(ellipse at 30% 40%, #1a1a3e 0%, #0a0a1a 100%); padding: 32px; min-height: 280px; position: relative; overflow: hidden;">
+      <!-- Stars background -->
+      <div style="position:absolute;inset:0;background-image: radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.5) 0%, transparent 100%), radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.3) 0%, transparent 100%), radial-gradient(1px 1px at 50% 30%, rgba(255,255,255,0.4) 0%, transparent 100%), radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.3) 0%, transparent 100%), radial-gradient(1px 1px at 90% 10%, rgba(255,255,255,0.5) 0%, transparent 100%), radial-gradient(1px 1px at 15% 85%, rgba(255,255,255,0.4) 0%, transparent 100%), radial-gradient(1px 1px at 80% 45%, rgba(255,255,255,0.3) 0%, transparent 100%);"></div>
+      <!-- Grid lines -->
+      <div style="position:absolute;inset:0;background-image: linear-gradient(rgba(100,140,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(100,140,255,0.06) 1px, transparent 1px); background-size: 60px 60px;"></div>
+      <!-- Nodes -->
+      <div style="position:absolute; left:20%; top:30%; width:44px; height:44px; border-radius:50%; background: radial-gradient(circle, #f59e0b 0%, #92400e 60%, transparent 100%); box-shadow: 0 0 20px rgba(245,158,11,0.4);"></div>
+      <div style="position:absolute; left:20%; top:30%; transform: translate(48px, 8px); font-size:10px; color:#f59e0b; font-family:monospace;">Alpha Belt</div>
+
+      <div style="position:absolute; left:55%; top:20%; width:32px; height:32px; border-radius:50%; background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, rgba(100,116,139,0.5) 50%, transparent 100%); box-shadow: 0 0 15px rgba(148,163,184,0.3);"></div>
+      <div style="position:absolute; left:55%; top:20%; transform: translate(36px, 4px); font-size:10px; color:#94a3b8; font-family:monospace;">Wreckage Field</div>
+
+      <div style="position:absolute; left:40%; top:65%; width:36px; height:36px; border-radius:50%; background: radial-gradient(circle, #ef4444 0%, #7f1d1d 60%, transparent 100%); box-shadow: 0 0 18px rgba(239,68,68,0.4);"></div>
+      <div style="position:absolute; left:40%; top:65%; transform: translate(40px, 6px); font-size:10px; color:#ef4444; font-family:monospace;">Raider Base</div>
+
+      <div style="position:absolute; left:75%; top:55%; width:28px; height:28px; border-radius:50%; border: 1px dashed rgba(234,179,8,0.4); display:flex; align-items:center; justify-content:center; color: rgba(234,179,8,0.6); font-size:16px; font-weight:bold;">?</div>
+      <div style="position:absolute; left:75%; top:55%; transform: translate(32px, 4px); font-size:10px; color:rgba(234,179,8,0.5); font-family:monospace;">1:3:7</div>
+
+      <!-- Connection lines (faint) -->
+      <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
+        <line x1="22%" y1="35%" x2="55%" y2="25%" stroke="rgba(100,140,255,0.1)" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="42%" y1="68%" x2="55%" y2="25%" stroke="rgba(100,140,255,0.1)" stroke-width="1" stroke-dasharray="4,4"/>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>A. Spatial Star Map</h3>
+      <p>Locations plotted as glowing nodes on a dark space canvas with subtle grid lines and connection paths. Each location type has a distinct color and glow. Detected signals pulse with a "?" marker. Feels like a real navigation system.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Hex grid -->
+  <div class="card" data-choice="hex-grid" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: #0a0a1a; padding: 32px; min-height: 280px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+      <div style="display: grid; grid-template-columns: repeat(5, 64px); gap: 4px; transform: scale(0.9);">
+        <!-- Row 1 -->
+        <div style="width:64px;height:72px;clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);background:#1e293b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
+          <span style="font-size:20px;">☄️</span>
+          <span style="font-size:7px;color:#f59e0b;">Alpha Belt</span>
+        </div>
+        <div style="width:64px;height:72px;clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);background:#0f172a;display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:8px;color:#334155;">empty</span>
+        </div>
+        <div style="width:64px;height:72px;clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
+          <span style="font-size:20px;">💀</span>
+          <span style="font-size:7px;color:#ef4444;">Raiders</span>
+        </div>
+        <div style="width:64px;height:72px;clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);background:#0f172a;display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:8px;color:#334155;">empty</span>
+        </div>
+        <div style="width:64px;height:72px;clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);background:rgba(234,179,8,0.08);border:1px dashed rgba(234,179,8,0.3);display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:24px;color:rgba(234,179,8,0.5);font-weight:bold;">?</span>
+        </div>
+        <!-- Row 2 (offset) -->
+        <div style="width:64px;height:72px;clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);background:#0f172a;display:flex;align-items:center;justify-content:center;grid-column: span 1;">
+          <span style="font-size:8px;color:#334155;">empty</span>
+        </div>
+        <div style="width:64px;height:72px;clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);background:rgba(148,163,184,0.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
+          <span style="font-size:20px;">🪨</span>
+          <span style="font-size:7px;color:#94a3b8;">Debris</span>
+        </div>
+        <div style="width:64px;height:72px;clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);background:#0f172a;display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:8px;color:#334155;">empty</span>
+        </div>
+        <div style="width:64px;height:72px;clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);background:rgba(234,179,8,0.08);border:1px dashed rgba(234,179,8,0.3);display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:24px;color:rgba(234,179,8,0.5);font-weight:bold;">?</span>
+        </div>
+        <div style="width:64px;height:72px;clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);background:#1e293b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
+          <span style="font-size:20px;">☄️</span>
+          <span style="font-size:7px;color:#f59e0b;">Gamma</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Hex Grid</h3>
+      <p>Hexagonal tiles with emoji icons and subtle color-coding per type. Compact, organized, game-like feel. Each hex shows its icon and name. Detected tiles get a dashed border with "?" mark. Good spatial density but still uses emoji.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Rich cards grid -->
+  <div class="card" data-choice="rich-cards" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: #0a0a1a; padding: 20px; min-height: 280px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+      <!-- Asteroid card -->
+      <div style="background: linear-gradient(135deg, #1a1505 0%, #0f0d08 100%); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; overflow: hidden;">
+        <div style="height: 80px; background: linear-gradient(180deg, rgba(245,158,11,0.15) 0%, transparent 100%); display: flex; align-items: center; justify-content: center; position: relative;">
+          <div style="width:40px;height:28px;background:radial-gradient(ellipse, #78716c 0%, #44403c 50%, transparent 80%);border-radius:40%;transform:rotate(-15deg);"></div>
+          <div style="position:absolute;width:20px;height:14px;background:radial-gradient(ellipse, #a8a29e 0%, #57534e 50%, transparent 80%);border-radius:40%;top:20px;right:25%;transform:rotate(20deg);"></div>
+          <div style="position:absolute;width:12px;height:8px;background:radial-gradient(ellipse, #d6d3d1 0%, #78716c 50%, transparent 80%);border-radius:40%;bottom:15px;left:20%;"></div>
+        </div>
+        <div style="padding:8px;">
+          <div style="font-size:10px;font-weight:600;color:#f59e0b;">Alpha Belt</div>
+          <div style="font-size:8px;color:#92400e;margin-top:2px;">Asteroid Field</div>
+        </div>
+      </div>
+      <!-- Bandit card -->
+      <div style="background: linear-gradient(135deg, #1a0505 0%, #0f0808 100%); border: 1px solid rgba(239,68,68,0.2); border-radius: 8px; overflow: hidden;">
+        <div style="height: 80px; background: linear-gradient(180deg, rgba(239,68,68,0.1) 0%, transparent 100%); display: flex; align-items: center; justify-content: center;">
+          <div style="width:32px;height:32px;border-radius:4px;background:linear-gradient(135deg,#374151,#1f2937);border:1px solid rgba(239,68,68,0.3);display:flex;align-items:center;justify-content:center;font-size:14px;">💀</div>
+        </div>
+        <div style="padding:8px;">
+          <div style="font-size:10px;font-weight:600;color:#ef4444;">Raider Base</div>
+          <div style="font-size:8px;color:#991b1b;margin-top:2px;">Bandit Camp</div>
+        </div>
+      </div>
+      <!-- Detected card -->
+      <div style="background: linear-gradient(135deg, #1a1a05 0%, #0f0f08 100%); border: 1px dashed rgba(234,179,8,0.3); border-radius: 8px; overflow: hidden;">
+        <div style="height: 80px; background: linear-gradient(180deg, rgba(234,179,8,0.05) 0%, transparent 100%); display: flex; align-items: center; justify-content: center;">
+          <div style="font-size:28px;color:rgba(234,179,8,0.4);font-weight:bold;animation:pulse 2s infinite;">?</div>
+        </div>
+        <div style="padding:8px;">
+          <div style="font-size:10px;font-weight:600;color:rgba(234,179,8,0.6);">Unknown Signal</div>
+          <div style="font-size:8px;color:rgba(234,179,8,0.3);margin-top:2px;">1:3:7</div>
+        </div>
+      </div>
+      <!-- Debris card -->
+      <div style="background: linear-gradient(135deg, #0d1117 0%, #0a0c10 100%); border: 1px solid rgba(148,163,184,0.15); border-radius: 8px; overflow: hidden;">
+        <div style="height: 80px; background: linear-gradient(180deg, rgba(148,163,184,0.08) 0%, transparent 100%); display: flex; align-items: center; justify-content: center; position: relative;">
+          <div style="width:30px;height:16px;background:linear-gradient(135deg,#475569,#334155);border-radius:2px;transform:rotate(25deg);"></div>
+          <div style="position:absolute;width:14px;height:10px;background:linear-gradient(135deg,#64748b,#475569);border-radius:1px;top:22px;right:30%;transform:rotate(-15deg);"></div>
+        </div>
+        <div style="padding:8px;">
+          <div style="font-size:10px;font-weight:600;color:#94a3b8;">Wreckage Field</div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;">Debris Field</div>
+        </div>
+      </div>
+      <!-- Cleared card -->
+      <div style="background: linear-gradient(135deg, #0a0a12 0%, #08080e 100%); border: 1px solid rgba(71,85,105,0.2); border-radius: 8px; overflow: hidden; opacity: 0.5;">
+        <div style="height: 80px; background: linear-gradient(180deg, rgba(71,85,105,0.05) 0%, transparent 100%); display: flex; align-items: center; justify-content: center;">
+          <div style="font-size:10px;color:#334155;">CLEARED</div>
+        </div>
+        <div style="padding:8px;">
+          <div style="font-size:10px;font-weight:600;color:#475569;">Delta Shoal</div>
+          <div style="font-size:8px;color:#334155;margin-top:2px;">Asteroid Field</div>
+        </div>
+      </div>
+      <!-- Empty -->
+      <div style="border-radius: 8px; display: flex; align-items: center; justify-content: center; height: 110px;">
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Rich Cards Grid</h3>
+      <p>Same card grid layout you already have, but each card gets a themed illustration area at the top — asteroids, debris chunks, skulls for bandits. Color-coded borders and gradients per type. Consistent with the shipyard card style. Cleared locations fade out.</p>
+    </div>
+  </div>
+</div>
+
+<style>
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+  }
+</style>

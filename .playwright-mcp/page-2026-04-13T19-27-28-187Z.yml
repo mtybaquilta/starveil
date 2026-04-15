@@ -1,0 +1,183 @@
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6]: "STARVEIL: Intestellar Siege"
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e10]: 13,415
+        - generic [ref=e11]: +680/h
+        - generic [ref=e12]: Metal
+      - generic [ref=e13]:
+        - generic [ref=e15]: 4,634
+        - generic [ref=e16]: +69/h
+        - generic [ref=e17]: Gas
+      - generic [ref=e18]:
+        - generic [ref=e20]: 784/897
+        - generic [ref=e21]: energy
+    - generic [ref=e22]:
+      - generic [ref=e23]: 🔆 Solar Flare1h 6m
+      - generic [ref=e24]: Homeworld · 1:402:10
+  - generic [ref=e25]:
+    - generic [ref=e26]:
+      - navigation [ref=e27]:
+        - link "Overview" [ref=e28] [cursor=pointer]:
+          - /url: /
+        - link "Buildings" [ref=e29] [cursor=pointer]:
+          - /url: /buildings
+        - link "Resources" [ref=e30] [cursor=pointer]:
+          - /url: /resources
+        - link "Shipyard" [ref=e31] [cursor=pointer]:
+          - /url: /shipyard
+        - link "Fleet" [ref=e32] [cursor=pointer]:
+          - /url: /fleet
+        - link "Galaxy Map" [ref=e33] [cursor=pointer]:
+          - /url: /galaxy
+        - link "Missions" [ref=e34] [cursor=pointer]:
+          - /url: /missions
+        - link "Research" [ref=e35] [cursor=pointer]:
+          - /url: /research
+        - link "Inbox" [ref=e36] [cursor=pointer]:
+          - /url: /inbox
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - generic [ref=e39]: Construction
+          - generic [ref=e40]: No active build
+        - button "Sign Out" [ref=e42]
+    - main [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - heading "Fleet" [level=1] [ref=e46]
+          - paragraph [ref=e47]: Manage your ships, scrap hulls, or deploy to missions
+        - generic [ref=e48]:
+          - generic [ref=e49]: Fleet Power
+          - generic [ref=e50]:
+            - generic [ref=e51]:
+              - generic [ref=e52]: "444"
+              - generic [ref=e53]: Attack
+            - generic [ref=e54]:
+              - generic [ref=e55]: "340"
+              - generic [ref=e56]: Defense
+            - generic [ref=e57]:
+              - generic [ref=e58]: 3,550
+              - generic [ref=e59]: Cargo
+            - generic [ref=e60]:
+              - generic [ref=e61]: "15"
+              - generic [ref=e62]: Ships
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e65]:
+              - generic [ref=e66]: 🔭
+              - generic [ref=e67]:
+                - generic [ref=e68]: Probe
+                - generic [ref=e69]: Spd 15 · Atk 0 · Def 1 · Cargo 0
+            - generic [ref=e70]:
+              - generic [ref=e71]:
+                - text: "2"
+                - generic [ref=e72]: /2
+              - generic [ref=e73]: all home
+            - generic [ref=e74]:
+              - button "Scrap" [ref=e75]
+              - button "Deploy →" [ref=e76]
+          - generic [ref=e77]:
+            - generic [ref=e78]:
+              - generic [ref=e79]: ⚔️
+              - generic [ref=e80]:
+                - generic [ref=e81]: Small Fighter
+                - generic [ref=e82]: Spd 14 · Atk 18 · Def 10 · Cargo 50
+            - generic [ref=e83]:
+              - generic [ref=e84]:
+                - text: "3"
+                - generic [ref=e85]: /3
+              - generic [ref=e86]: all home
+            - generic [ref=e87]:
+              - button "Scrap" [ref=e88]
+              - button "Deploy →" [ref=e89]
+          - generic [ref=e90]:
+            - generic [ref=e91]:
+              - generic [ref=e92]: 🛡️
+              - generic [ref=e93]:
+                - generic [ref=e94]: Large Fighter
+                - generic [ref=e95]: Spd 8 · Atk 55 · Def 40 · Cargo 200
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - text: "7"
+                - generic [ref=e98]: /7
+              - generic [ref=e99]: all home
+            - generic [ref=e100]:
+              - button "Scrap" [ref=e101]
+              - button "Deploy →" [ref=e102]
+          - generic [ref=e103]:
+            - generic [ref=e104]:
+              - generic [ref=e105]: 🚀
+              - generic [ref=e106]:
+                - generic [ref=e107]: Cruiser
+                - generic [ref=e108]: Spd 7 · Atk 80 · Def 70 · Cargo 400
+            - generic [ref=e110]:
+              - text: "0"
+              - generic [ref=e111]: /0
+            - generic [ref=e112]:
+              - button "Scrap" [disabled] [ref=e113]
+              - button "Deploy →" [disabled] [ref=e114]
+          - generic [ref=e115]:
+            - generic [ref=e116]:
+              - generic [ref=e117]: 💥
+              - generic [ref=e118]:
+                - generic [ref=e119]: Gunship
+                - generic [ref=e120]: Spd 5 · Atk 150 · Def 100 · Cargo 300
+            - generic [ref=e122]:
+              - text: "0"
+              - generic [ref=e123]: /0
+            - generic [ref=e124]:
+              - button "Scrap" [disabled] [ref=e125]
+              - button "Deploy →" [disabled] [ref=e126]
+          - generic [ref=e127]:
+            - generic [ref=e128]:
+              - generic [ref=e129]: ☠️
+              - generic [ref=e130]:
+                - generic [ref=e131]: Destroyer
+                - generic [ref=e132]: Spd 4 · Atk 300 · Def 200 · Cargo 500
+            - generic [ref=e134]:
+              - text: "0"
+              - generic [ref=e135]: /0
+            - generic [ref=e136]:
+              - button "Scrap" [disabled] [ref=e137]
+              - button "Deploy →" [disabled] [ref=e138]
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - generic [ref=e141]: ⛏️
+              - generic [ref=e142]:
+                - generic [ref=e143]: Harvester
+                - generic [ref=e144]: Spd 6 · Atk 2 · Def 10 · Cargo 0
+            - generic [ref=e145]:
+              - generic [ref=e146]:
+                - text: "2"
+                - generic [ref=e147]: /2
+              - generic [ref=e148]: all home
+            - generic [ref=e149]:
+              - button "Scrap" [ref=e150]
+              - button "Deploy →" [ref=e151]
+          - generic [ref=e152]:
+            - generic [ref=e153]:
+              - generic [ref=e154]: 📦
+              - generic [ref=e155]:
+                - generic [ref=e156]: Small Cargo
+                - generic [ref=e157]: Spd 8 · Atk 1 · Def 8 · Cargo 2,000
+            - generic [ref=e158]:
+              - generic [ref=e159]:
+                - text: "1"
+                - generic [ref=e160]: /1
+              - generic [ref=e161]: all home
+            - generic [ref=e162]:
+              - button "Scrap" [ref=e163]
+              - button "Deploy →" [ref=e164]
+          - generic [ref=e165]:
+            - generic [ref=e166]:
+              - generic [ref=e167]: 🚢
+              - generic [ref=e168]:
+                - generic [ref=e169]: Large Cargo
+                - generic [ref=e170]: Spd 5 · Atk 2 · Def 15 · Cargo 10,000
+            - generic [ref=e172]:
+              - text: "0"
+              - generic [ref=e173]: /0
+            - generic [ref=e174]:
+              - button "Scrap" [disabled] [ref=e175]
+              - button "Deploy →" [disabled] [ref=e176]
