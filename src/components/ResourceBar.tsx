@@ -20,6 +20,7 @@ type Props = {
   weatherMetalMultiplier: number
   weatherGasMultiplier: number
   weatherStationLevel: number
+  incomingAttackCount: number
 }
 
 const WEATHER_LABELS: Record<string, string> = {
@@ -78,6 +79,7 @@ export function ResourceBar({
   energyProduced, energyConsumed, energyRatio,
   planetName, coordinates, weatherType, weatherExpiresAt,
   weatherMetalMultiplier, weatherGasMultiplier, weatherStationLevel,
+  incomingAttackCount,
 }: Props) {
   const [weatherRemaining, setWeatherRemaining] = useState<number | null>(null)
 
@@ -145,6 +147,11 @@ export function ResourceBar({
             <span className="text-slate-600 ml-1.5">{formatWeatherTime(weatherRemaining)}</span>
           )}
         </span>
+        {incomingAttackCount > 0 && (
+          <span className="text-red-400 font-semibold animate-pulse">
+            {incomingAttackCount} incoming {incomingAttackCount === 1 ? 'attack' : 'attacks'}
+          </span>
+        )}
         <span className="text-slate-500">{planetName} · {coordinates}</span>
       </div>
     </div>

@@ -12,13 +12,16 @@ import { useShipQueue } from '../hooks/useShipQueue'
 import { useMissions } from '../hooks/useMissions'
 import { useResearchQueue } from '../hooks/useResearchQueue'
 import { useWeather } from '../hooks/useWeather'
+import { useAttacks } from '../hooks/useAttacks'
 
 export function Layout() {
   const { planets, selectedPlanetId, selectPlanet, refetchPlanets } = usePlanets()
   const {
     planet, buildings, constructionQueue, shipFleet, shipQueue,
     missions, completedMissions, galaxyMap, technologies, researchQueue,
-    weather, events, achievements, loading, refetch,
+    weather, events, achievements,
+    outgoingAttacks: outgoingAttacksRaw, incomingAttacks: incomingAttacksRaw,
+    loading, refetch,
   } = usePlanet(selectedPlanetId)
   const resources = useResources(planet, buildings, weather, technologies)
   const { activeBuild, timeRemaining, startBuild } = useConstructionQueue(
@@ -42,6 +45,12 @@ export function Layout() {
     refetch
   )
   useWeather(planet?.id, weather, refetch)
+  const { outgoingAttacks, incomingAttacks, dispatchAttack } = useAttacks(
+    planet?.id,
+    outgoingAttacksRaw,
+    incomingAttacksRaw,
+    async () => { await Promise.all([refetch(), refetchPlanets()]) }
+  )
 
   const refetchAll = async () => {
     await Promise.all([refetch(), refetchPlanets()])
@@ -86,6 +95,7 @@ export function Layout() {
           weatherMetalMultiplier={weather ? Number(weather.metal_multiplier) : 1}
           weatherGasMultiplier={weather ? Number(weather.gas_multiplier) : 1}
           weatherStationLevel={buildings.find((b) => b.building_id === 'weather_station')?.level ?? 0}
+          incomingAttackCount={incomingAttacks.filter((a) => a.status === 'in_transit').length}
         />
         {planets.length > 1 && (
           <PlanetSelector
@@ -133,6 +143,9 @@ export function Layout() {
               activeResearch,
               researchTimeRemaining,
               achievements,
+              outgoingAttacks,
+              incomingAttacks,
+              dispatchAttack,
               planets,
               selectPlanet,
               refetch: refetchAll,
@@ -167,6 +180,9 @@ export type GameContext = {
   activeResearch: ReturnType<typeof useResearchQueue>['activeResearch']
   researchTimeRemaining: ReturnType<typeof useResearchQueue>['researchTimeRemaining']
   achievements: ReturnType<typeof usePlanet>['achievements']
+  outgoingAttacks: ReturnType<typeof usePlanet>['outgoingAttacks']
+  incomingAttacks: ReturnType<typeof usePlanet>['incomingAttacks']
+  dispatchAttack: ReturnType<typeof useAttacks>['dispatchAttack']
   planets: ReturnType<typeof usePlanets>['planets']
   selectPlanet: ReturnType<typeof usePlanets>['selectPlanet']
   refetch: () => Promise<void>

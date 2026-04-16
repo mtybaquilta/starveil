@@ -95,6 +95,28 @@ export type PlayerAchievement = {
   unlocked_at: string
 }
 
+export type PlayerAttack = {
+  id: string
+  attacker_id: string
+  attacker_planet_id: string
+  defender_id: string
+  defender_planet_id: string
+  fleet: Record<string, number>
+  status: 'in_transit' | 'returning' | 'resolved'
+  dispatched_at: string
+  arrives_at: string
+  return_arrives_at: string | null
+  resolved_at: string | null
+  result: {
+    victory?: boolean
+    stolen?: { metal: number; gas: number }
+    surviving_fleet?: Record<string, number>
+    attacker_losses?: Record<string, number>
+    defender_losses?: Record<string, number>
+  } | null
+  target_coordinates: string
+}
+
 export type Planet = {
   id: string
   name: string
@@ -120,6 +142,8 @@ export function usePlanet(selectedPlanetId: string | null) {
   const [weather, setWeather] = useState<PlanetWeather | null>(null)
   const [events, setEvents] = useState<PlanetEvent[]>([])
   const [achievements, setAchievements] = useState<PlayerAchievement[]>([])
+  const [outgoingAttacks, setOutgoingAttacks] = useState<PlayerAttack[]>([])
+  const [incomingAttacks, setIncomingAttacks] = useState<PlayerAttack[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -146,6 +170,7 @@ export function usePlanet(selectedPlanetId: string | null) {
         buildingsRes, queueRes, weatherRes, eventsRes,
         shipsRes, shipQueueRes, missionsRes, completedMissionsRes,
         galaxyRes, techRes, researchRes, achievementsRes,
+        outgoingAttacksRes, incomingAttacksRes,
       ] = await Promise.all([
         supabase
           .from('planet_buildings')
@@ -206,6 +231,18 @@ export function usePlanet(selectedPlanetId: string | null) {
           .from('player_achievements')
           .select('achievement_id, unlocked_at')
           .eq('player_id', playerId),
+        supabase
+          .from('player_attacks')
+          .select('*')
+          .eq('attacker_id', playerId)
+          .neq('status', 'resolved')
+          .order('dispatched_at', { ascending: false }),
+        supabase
+          .from('player_attacks')
+          .select('*')
+          .eq('defender_id', playerId)
+          .neq('status', 'resolved')
+          .order('dispatched_at', { ascending: false }),
       ])
 
       if (buildingsRes.data) setBuildings(buildingsRes.data)
@@ -220,6 +257,8 @@ export function usePlanet(selectedPlanetId: string | null) {
       if (techRes.data) setTechnologies(techRes.data)
       if (researchRes.data) setResearchQueue(researchRes.data)
       if (achievementsRes.data) setAchievements(achievementsRes.data)
+      if (outgoingAttacksRes.data) setOutgoingAttacks(outgoingAttacksRes.data)
+      if (incomingAttacksRes.data) setIncomingAttacks(incomingAttacksRes.data)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -245,6 +284,8 @@ export function usePlanet(selectedPlanetId: string | null) {
     weather,
     events,
     achievements,
+    outgoingAttacks,
+    incomingAttacks,
     loading,
     error,
     refetch: fetchAll,
