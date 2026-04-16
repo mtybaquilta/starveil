@@ -1,8 +1,10 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { ACHIEVEMENTS } from '../config/achievements'
 
 type Props = {
   activeMissionCount: number
+  achievementCount: number
 }
 
 const NAV_ITEMS = [
@@ -14,12 +16,13 @@ const NAV_ITEMS = [
   { to: '/galaxy', label: 'Galaxy Map' },
   { to: '/missions', label: 'Missions' },
   { to: '/research', label: 'Research' },
+  { to: '/achievements', label: 'Achievements' },
   { to: '/inbox', label: 'Inbox' },
 ]
 
 const LOCKED_ITEMS: { label: string; hint: string }[] = []
 
-export function Sidebar({ activeMissionCount }: Props) {
+export function Sidebar({ activeMissionCount, achievementCount }: Props) {
   const { signOut } = useAuth()
 
   return (
@@ -42,6 +45,11 @@ export function Sidebar({ activeMissionCount }: Props) {
             {item.to === '/missions' && activeMissionCount > 0 && (
               <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold bg-indigo-500/20 text-indigo-400 rounded-full">
                 {activeMissionCount}
+              </span>
+            )}
+            {item.to === '/achievements' && (
+              <span className="ml-1.5 text-[9px] text-slate-500">
+                {achievementCount}/{ACHIEVEMENTS.length}
               </span>
             )}
           </NavLink>

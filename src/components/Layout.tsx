@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import { ResourceBar } from './ResourceBar'
 import { QueueStrip } from './QueueStrip'
 import { Sidebar } from './Sidebar'
+import { AchievementToast } from './AchievementToast'
 import { usePlanet } from '../hooks/usePlanet'
 import { useResources } from '../hooks/useResources'
 import { useConstructionQueue } from '../hooks/useConstructionQueue'
@@ -14,7 +15,7 @@ export function Layout() {
   const {
     planet, buildings, constructionQueue, shipFleet, shipQueue,
     missions, completedMissions, galaxyMap, technologies, researchQueue,
-    weather, events, loading, refetch,
+    weather, events, achievements, loading, refetch,
   } = usePlanet()
   const resources = useResources(planet, buildings, weather, technologies)
   const { activeBuild, timeRemaining, startBuild } = useConstructionQueue(
@@ -57,6 +58,7 @@ export function Layout() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col">
+      <AchievementToast achievements={achievements} />
       <ResourceBar
         metal={resources.metal}
         gas={resources.gas}
@@ -88,6 +90,7 @@ export function Layout() {
       <div className="flex flex-1">
         <Sidebar
           activeMissionCount={activeMissions.length}
+          achievementCount={achievements.length}
         />
         <main className="flex-1 p-6 overflow-y-auto">
           <Outlet
@@ -113,6 +116,7 @@ export function Layout() {
               researchQueue,
               activeResearch,
               researchTimeRemaining,
+              achievements,
               refetch,
             }}
           />
@@ -144,5 +148,6 @@ export type GameContext = {
   researchQueue: ReturnType<typeof usePlanet>['researchQueue']
   activeResearch: ReturnType<typeof useResearchQueue>['activeResearch']
   researchTimeRemaining: ReturnType<typeof useResearchQueue>['researchTimeRemaining']
+  achievements: ReturnType<typeof usePlanet>['achievements']
   refetch: () => Promise<void>
 }

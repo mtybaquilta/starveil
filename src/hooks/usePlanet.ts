@@ -90,6 +90,11 @@ export type PlanetEvent = {
   created_at: string
 }
 
+export type PlayerAchievement = {
+  achievement_id: string
+  unlocked_at: string
+}
+
 export type Planet = {
   id: string
   name: string
@@ -114,6 +119,7 @@ export function usePlanet() {
   const [researchQueue, setResearchQueue] = useState<ResearchQueueItem[]>([])
   const [weather, setWeather] = useState<PlanetWeather | null>(null)
   const [events, setEvents] = useState<PlanetEvent[]>([])
+  const [achievements, setAchievements] = useState<PlayerAchievement[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -136,7 +142,7 @@ export function usePlanet() {
       const [
         buildingsRes, queueRes, weatherRes, eventsRes,
         shipsRes, shipQueueRes, missionsRes, completedMissionsRes,
-        galaxyRes, techRes, researchRes,
+        galaxyRes, techRes, researchRes, achievementsRes,
       ] = await Promise.all([
         supabase
           .from('planet_buildings')
@@ -193,6 +199,10 @@ export function usePlanet() {
           .from('research_queue')
           .select('*')
           .eq('player_id', playerId),
+        supabase
+          .from('player_achievements')
+          .select('achievement_id, unlocked_at')
+          .eq('player_id', playerId),
       ])
 
       if (buildingsRes.data) setBuildings(buildingsRes.data)
@@ -206,6 +216,7 @@ export function usePlanet() {
       if (galaxyRes.data) setGalaxyMap(galaxyRes.data)
       if (techRes.data) setTechnologies(techRes.data)
       if (researchRes.data) setResearchQueue(researchRes.data)
+      if (achievementsRes.data) setAchievements(achievementsRes.data)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -230,6 +241,7 @@ export function usePlanet() {
     researchQueue,
     weather,
     events,
+    achievements,
     loading,
     error,
     refetch: fetchAll,

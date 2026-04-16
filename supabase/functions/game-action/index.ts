@@ -432,6 +432,159 @@ function resolveCombat(
 }
 
 // ============================================================
+// Achievement helpers
+// ============================================================
+
+const DEFENSE_BUILDING_IDS = ['perimeter_turret', 'ion_cannon', 'missile_battery', 'shield_generator', 'sensor_jammer', 'orbital_platform']
+
+const TECH_BRANCHES: Record<string, string[]> = {
+  military:    ['reinforced_hulls', 'advanced_weapons', 'capital_ship_engineering'],
+  economy:     ['efficient_refining', 'deep_core_mining', 'expanded_storage', 'rapid_extraction'],
+  exploration: ['long_range_sensors', 'probe_durability', 'advanced_cartography'],
+  energy:      ['solar_efficiency', 'storm_hardening', 'fusion_theory'],
+}
+
+// deno-lint-ignore no-explicit-any
+async function checkBuildAchievements(supabase: any, userId: string, planetId: string) {
+  const { data: buildings } = await supabase.from('planet_buildings').select('building_id, level').eq('planet_id', planetId)
+  if (!buildings) return []
+  // deno-lint-ignore no-explicit-any
+  const bMap = new Map(buildings.map((b: any) => [b.building_id, b.level]))
+  const unlocked: string[] = []
+
+  // first_steps: HQ Lv.2
+  if ((bMap.get('headquarters') ?? 0) >= 2) unlocked.push('first_steps')
+  // architect: any building Lv.5
+  // deno-lint-ignore no-explicit-any
+  if (buildings.some((b: any) => b.level >= 5)) unlocked.push('architect')
+  // megalopolis: any building Lv.10
+  // deno-lint-ignore no-explicit-any
+  if (buildings.some((b: any) => b.level >= 10)) unlocked.push('megalopolis')
+  // power_grid: solar_array Lv.5
+  if ((bMap.get('solar_array') ?? 0) >= 5) unlocked.push('power_grid')
+  // fortified: all defense structures built (level >= 1)
+  if (DEFENSE_BUILDING_IDS.every(id => (bMap.get(id) ?? 0) >= 1)) unlocked.push('fortified')
+  // industrialist: metal_mine + gas_refinery both Lv.5+
+  if ((bMap.get('metal_mine') ?? 0) >= 5 && (bMap.get('gas_refinery') ?? 0) >= 5) unlocked.push('industrialist')
+
+  return await insertAchievements(supabase, userId, unlocked)
+}
+
+// deno-lint-ignore no-explicit-any
+async function checkResearchAchievements(supabase: any, userId: string) {
+  const { data: techs } = await supabase.from('player_technologies').select('tech_id, level').eq('player_id', userId)
+  if (!techs) return []
+  const unlocked: string[] = []
+  // deno-lint-ignore no-explicit-any
+  const researched = techs.filter((t: any) => t.level > 0)
+
+  // curious_mind: 1+ tech
+  if (researched.length >= 1) unlocked.push('curious_mind')
+  // scholar: 5+ techs
+  if (researched.length >= 5) unlocked.push('scholar')
+  // specialist: any tech maxed
+  // deno-lint-ignore no-explicit-any
+  if (researched.some((t: any) => {
+    const config = TECH_CONFIGS[t.tech_id]
+    return config && t.level >= config.maxLevel
+  })) unlocked.push('specialist')
+  // visionary: all techs in any branch researched (level >= 1)
+  // deno-lint-ignore no-explicit-any
+  const techMap = new Map(techs.map((t: any) => [t.tech_id, t.level]))
+  for (const branchTechs of Object.values(TECH_BRANCHES)) {
+    if (branchTechs.every(id => (techMap.get(id) ?? 0) >= 1)) {
+      unlocked.push('visionary')
+      break
+    }
+  }
+
+  return await insertAchievements(supabase, userId, unlocked)
+}
+
+// deno-lint-ignore no-explicit-any
+async function checkMissionAchievements(supabase: any, userId: string, planetId: string) {
+  const unlocked: string[] = []
+
+  // Count completed raid missions with victory
+  const { count: raidWins } = await supabase.from('planet_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('planet_id', planetId)
+    .eq('event_type', 'mission_completed')
+    .like('message', 'raid returned%')
+    .not('message', 'like', '%+0 metal, +0 gas%')
+
+  if (raidWins >= 1) unlocked.push('first_blood')
+  if (raidWins >= 10) unlocked.push('unstoppable')
+
+  return await insertAchievements(supabase, userId, unlocked)
+}
+
+// deno-lint-ignore no-explicit-any
+async function checkShipAchievements(supabase: any, userId: string, planetId: string) {
+  const { data: ships } = await supabase.from('planet_ships').select('count').eq('planet_id', planetId)
+  if (!ships) return []
+  // deno-lint-ignore no-explicit-any
+  const totalShips = ships.reduce((sum: number, s: any) => sum + (s.count ?? 0), 0)
+  const unlocked: string[] = []
+
+  if (totalShips >= 50) unlocked.push('fleet_commander')
+  if (totalShips >= 100) unlocked.push('armada')
+
+  return await insertAchievements(supabase, userId, unlocked)
+}
+
+// deno-lint-ignore no-explicit-any
+async function checkExplorationAchievements(supabase: any, userId: string, planetId: string) {
+  const { count: revealed } = await supabase.from('galaxy_map')
+    .select('id', { count: 'exact', head: true })
+    .eq('planet_id', planetId)
+    .not('location_type', 'is', null)
+
+  const unlocked: string[] = []
+  unlocked.push('pioneer') // if send_probe was called, they've sent a probe
+  if (revealed >= 10) unlocked.push('cartographer')
+  if (revealed >= 50) unlocked.push('galaxy_explorer')
+
+  return await insertAchievements(supabase, userId, unlocked)
+}
+
+// deno-lint-ignore no-explicit-any
+async function checkResourceAchievements(supabase: any, userId: string, planetId: string) {
+  const { data: planet } = await supabase.from('planets').select('metal_amount, gas_amount').eq('id', planetId).single()
+  if (!planet) return []
+  const unlocked: string[] = []
+
+  if (planet.metal_amount >= 10000) unlocked.push('miner')
+  if (planet.metal_amount >= 100000) unlocked.push('tycoon')
+  if (planet.gas_amount >= 100000) unlocked.push('gas_baron')
+
+  return await insertAchievements(supabase, userId, unlocked)
+}
+
+// deno-lint-ignore no-explicit-any
+async function insertAchievements(supabase: any, userId: string, achievementIds: string[]): Promise<string[]> {
+  if (achievementIds.length === 0) return []
+
+  // Check which are already unlocked
+  const { data: existing } = await supabase.from('player_achievements')
+    .select('achievement_id')
+    .eq('player_id', userId)
+    .in('achievement_id', achievementIds)
+
+  // deno-lint-ignore no-explicit-any
+  const alreadyUnlocked = new Set((existing ?? []).map((a: any) => a.achievement_id))
+  const newAchievements = achievementIds.filter(id => !alreadyUnlocked.has(id))
+
+  if (newAchievements.length === 0) return []
+
+  await supabase.from('player_achievements').insert(
+    newAchievements.map(id => ({ player_id: userId, achievement_id: id }))
+  )
+
+  return newAchievements
+}
+
+// ============================================================
 // Building handlers
 // ============================================================
 
@@ -502,7 +655,9 @@ async function handleCompleteBuild(supabase: any, userId: string, planetId: stri
   }
 
   await recalculateResources(supabase, planetId)
-  return new Response(JSON.stringify({ success: true, completed }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+  const newAchievements = await checkBuildAchievements(supabase, userId, planetId)
+  await checkResourceAchievements(supabase, userId, planetId)
+  return new Response(JSON.stringify({ success: true, completed, newAchievements }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }
 
 // ============================================================
@@ -599,7 +754,8 @@ async function handleCompleteShipBuild(supabase: any, userId: string, planetId: 
     await supabase.from('ship_queue').update({ started_at: startedAt.toISOString(), completes_at: completesAt.toISOString() }).eq('id', next.id)
   }
 
-  return new Response(JSON.stringify({ success: true, completed }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+  const newAchievements = await checkShipAchievements(supabase, userId, planetId)
+  return new Response(JSON.stringify({ success: true, completed, newAchievements }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }
 
 // ============================================================
@@ -735,7 +891,8 @@ async function handleSendProbe(supabase: any, userId: string, planetId: string, 
 
   await supabase.from('planet_events').insert({ planet_id: planetId, event_type: 'probe_returned', message: `Probe revealed: ${name} at ${targetCoords}`, metadata: { coordinates: targetCoords, location_type: locationType, name } })
 
-  return new Response(JSON.stringify({ success: true, location_type: locationType, name }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+  const newAchievements = await checkExplorationAchievements(supabase, userId, planetId)
+  return new Response(JSON.stringify({ success: true, location_type: locationType, name, newAchievements }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }
 
 // ============================================================
@@ -807,7 +964,8 @@ async function handleCompleteResearch(supabase: any, userId: string, cors: Recor
     completed.push({ techId: r.tech_id, level: r.target_level })
   }
 
-  return new Response(JSON.stringify({ success: true, completed }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+  const newAchievements = await checkResearchAchievements(supabase, userId)
+  return new Response(JSON.stringify({ success: true, completed, newAchievements }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }
 
 // ============================================================
@@ -965,7 +1123,9 @@ async function handleResolveMission(supabase: any, userId: string, planetId: str
     metadata: { mission_type: mission.mission_type, result, mission_id: missionId },
   })
 
-  return new Response(JSON.stringify({ success: true, result }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+  const newAchievements = await checkMissionAchievements(supabase, userId, planetId)
+  await checkResourceAchievements(supabase, userId, planetId)
+  return new Response(JSON.stringify({ success: true, result, newAchievements }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }
 
 // ============================================================
