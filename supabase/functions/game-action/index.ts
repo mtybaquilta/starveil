@@ -72,6 +72,21 @@ Deno.serve(async (req: Request) => {
     if (action === 'scrap_ship') {
       return await handleScrapShip(supabase, user.id, planetId, shipType, corsHeaders)
     }
+    if (action === 'dispatch_colonize') {
+      return await handleDispatchColonize(supabase, user.id, planetId, body.targetCoords, !!devMode, corsHeaders)
+    }
+    if (action === 'resolve_colonize') {
+      return await handleResolveColonize(supabase, user.id, body.missionId, corsHeaders)
+    }
+    if (action === 'rename_planet') {
+      return await handleRenamePlanet(supabase, user.id, planetId, body.newName, corsHeaders)
+    }
+    if (action === 'dispatch_transfer') {
+      return await handleDispatchTransfer(supabase, user.id, planetId, body.destinationPlanetId, body.fleet, body.resources, !!devMode, corsHeaders)
+    }
+    if (action === 'resolve_transfer') {
+      return await handleResolveTransfer(supabase, user.id, body.missionId, corsHeaders)
+    }
 
     return new Response(JSON.stringify({ error: 'Unknown action' }), {
       status: 400,
@@ -168,6 +183,7 @@ const SHIPS: Record<string, {
   harvester:     { cost: { metal: 2000,  gas: 800   }, baseBuildTimeSeconds: 600,  requiredShipyardLevel: 3  },
   small_cargo:   { cost: { metal: 800,   gas: 400   }, baseBuildTimeSeconds: 300,  requiredShipyardLevel: 2  },
   large_cargo:   { cost: { metal: 4000,  gas: 2000  }, baseBuildTimeSeconds: 900,  requiredShipyardLevel: 5  },
+  colony_ship:   { cost: { metal: 20000, gas: 15000 }, baseBuildTimeSeconds: 7200, requiredShipyardLevel: 8, requiredTech: { techId: 'colonization_theory', level: 1 } },
 }
 
 const SHIP_STATS: Record<string, { speed: number; cargo: number; attack: number; defense: number; miningYield: number }> = {
@@ -180,6 +196,7 @@ const SHIP_STATS: Record<string, { speed: number; cargo: number; attack: number;
   harvester:     { speed: 6,  cargo: 0,     attack: 2,   defense: 10,  miningYield: 15 },
   small_cargo:   { speed: 8,  cargo: 2000,  attack: 1,   defense: 8,   miningYield: 0  },
   large_cargo:   { speed: 5,  cargo: 10000, attack: 2,   defense: 15,  miningYield: 0  },
+  colony_ship:   { speed: 3,  cargo: 0,     attack: 0,   defense: 50,  miningYield: 0  },
 }
 
 const MISSION_CONFIGS: Record<string, { requiredShips: string[]; minDurationSeconds: number }> = {
@@ -208,6 +225,7 @@ const TECH_CONFIGS: Record<string, {
   solar_efficiency:         { baseCost: { metal: 300,  gas: 200  }, baseTimeSeconds: 240, maxLevel: 10, requiredLabLevel: 1, prerequisites: [] },
   storm_hardening:          { baseCost: { metal: 800,  gas: 600  }, baseTimeSeconds: 600, maxLevel: 5,  requiredLabLevel: 3, prerequisites: [{ techId: 'solar_efficiency', level: 3 }] },
   fusion_theory:            { baseCost: { metal: 1000, gas: 800  }, baseTimeSeconds: 720, maxLevel: 10, requiredLabLevel: 5, prerequisites: [{ techId: 'solar_efficiency', level: 5 }] },
+  colonization_theory:     { baseCost: { metal: 5000, gas: 4000 }, baseTimeSeconds: 1800, maxLevel: 3, requiredLabLevel: 6, prerequisites: [{ techId: 'advanced_cartography', level: 3 }] },
 }
 
 // Galaxy map location types and their spawn weights
@@ -440,7 +458,7 @@ const DEFENSE_BUILDING_IDS = ['perimeter_turret', 'ion_cannon', 'missile_battery
 const TECH_BRANCHES: Record<string, string[]> = {
   military:    ['reinforced_hulls', 'advanced_weapons', 'capital_ship_engineering'],
   economy:     ['efficient_refining', 'deep_core_mining', 'expanded_storage', 'rapid_extraction'],
-  exploration: ['long_range_sensors', 'probe_durability', 'advanced_cartography'],
+  exploration: ['long_range_sensors', 'probe_durability', 'advanced_cartography', 'colonization_theory'],
   energy:      ['solar_efficiency', 'storm_hardening', 'fusion_theory'],
 }
 
@@ -868,16 +886,28 @@ async function handleSendProbe(supabase: any, userId: string, planetId: string, 
   // Consume probe (probes are not returned — consumed on use)
   await supabase.from('planet_ships').update({ count: probeCount - 1 }).eq('planet_id', planetId).eq('ship_type', 'probe')
 
-  // Roll location type and reveal
-  const locationType = rollLocationType()
-  const name = randomLocationName(locationType)
-  const now = new Date()
+  // Check for habitable planet at this coordinate first
+  const { data: habitablePlanet } = await supabase.from('galaxy_planets')
+    .select('id, name, diameter, max_building_slots, claimed_by')
+    .eq('coordinates', targetCoords)
+    .single()
 
+  const now = new Date()
   // deno-lint-ignore no-explicit-any
-  const metadata: Record<string, any> = {}
-  if (locationType === 'asteroid_field') metadata.richness = Math.floor(Math.random() * 5) + 1
-  if (locationType === 'bandit_camp') metadata.size = Math.random() < 0.5 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large'
-  if (locationType === 'debris_field') metadata.salvage_metal = Math.floor(Math.random() * 800 + 200)
+  let locationType: string, name: string, metadata: Record<string, any> = {}
+
+  if (habitablePlanet && !habitablePlanet.claimed_by) {
+    locationType = 'habitable_planet'
+    name = habitablePlanet.name
+    metadata = { galaxy_planet_id: habitablePlanet.id, diameter: habitablePlanet.diameter, max_building_slots: habitablePlanet.max_building_slots }
+  } else {
+    // Roll location type and reveal
+    locationType = rollLocationType()
+    name = randomLocationName(locationType)
+    if (locationType === 'asteroid_field') metadata.richness = Math.floor(Math.random() * 5) + 1
+    if (locationType === 'bandit_camp') metadata.size = Math.random() < 0.5 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large'
+    if (locationType === 'debris_field') metadata.salvage_metal = Math.floor(Math.random() * 800 + 200)
+  }
 
   await supabase.from('galaxy_map').update({
     visibility: 'revealed',
@@ -1126,6 +1156,335 @@ async function handleResolveMission(supabase: any, userId: string, planetId: str
   const newAchievements = await checkMissionAchievements(supabase, userId, planetId)
   await checkResourceAchievements(supabase, userId, planetId)
   return new Response(JSON.stringify({ success: true, result, newAchievements }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// ============================================================
+// Colonization handlers
+// ============================================================
+
+// deno-lint-ignore no-explicit-any
+async function handleDispatchColonize(supabase: any, userId: string, planetId: string, targetCoords: string, devMode: boolean, cors: Record<string, string>) {
+  const { data: planet } = await supabase.from('planets').select('id, player_id, coordinates').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Check the target is a revealed habitable_planet on galaxy map
+  const { data: mapEntry } = await supabase.from('galaxy_map').select('*').eq('player_id', userId).eq('coordinates', targetCoords).single()
+  if (!mapEntry || mapEntry.location_type !== 'habitable_planet') {
+    return new Response(JSON.stringify({ error: 'Target is not a habitable planet' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Check galaxy_planets is still unclaimed
+  const galaxyPlanetId = mapEntry.metadata?.galaxy_planet_id
+  if (!galaxyPlanetId) return new Response(JSON.stringify({ error: 'Invalid habitable planet data' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const { data: galaxyPlanet } = await supabase.from('galaxy_planets').select('*').eq('id', galaxyPlanetId).single()
+  if (!galaxyPlanet) return new Response(JSON.stringify({ error: 'Habitable planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+  if (galaxyPlanet.claimed_by) return new Response(JSON.stringify({ error: 'Planet already claimed' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Check colony ship availability
+  const { data: colonyShipRow } = await supabase.from('planet_ships').select('count').eq('planet_id', planetId).eq('ship_type', 'colony_ship').single()
+  const colonyShipCount = colonyShipRow?.count ?? 0
+  if (colonyShipCount < 1) return new Response(JSON.stringify({ error: 'No Colony Ship available' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Consume colony ship
+  await supabase.from('planet_ships').update({ count: colonyShipCount - 1 }).eq('planet_id', planetId).eq('ship_type', 'colony_ship')
+
+  // Calculate travel time
+  const distance = coordDistance(planet.coordinates, targetCoords)
+  const travelSeconds = devMode ? 10 : Math.max(60, Math.floor((distance / 3) * 60))
+  const now = new Date()
+  const arrivesAt = new Date(now.getTime() + travelSeconds * 1000)
+
+  // Create colonize mission
+  const { data: mission } = await supabase.from('missions').insert({
+    planet_id: planetId,
+    mission_type: 'colonize',
+    status: 'in_transit',
+    target_coords: targetCoords,
+    target_name: galaxyPlanet.name,
+    fleet: { colony_ship: 1 },
+    dispatched_at: now.toISOString(),
+    arrives_at: arrivesAt.toISOString(),
+    returns_at: arrivesAt.toISOString(), // no return — consumed
+  }).select('id').single()
+
+  await supabase.from('planet_events').insert({
+    planet_id: planetId,
+    event_type: 'colonize_dispatched',
+    message: `Colony Ship dispatched to ${galaxyPlanet.name} at ${targetCoords}`,
+    metadata: { target_coords: targetCoords, target_name: galaxyPlanet.name, mission_id: mission?.id },
+  })
+
+  return new Response(JSON.stringify({ success: true, missionId: mission?.id, arrivesAt: arrivesAt.toISOString() }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleResolveColonize(supabase: any, userId: string, missionId: string, cors: Record<string, string>) {
+  const { data: mission } = await supabase.from('missions').select('*').eq('id', missionId).single()
+  if (!mission || mission.mission_type !== 'colonize') return new Response(JSON.stringify({ error: 'Mission not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Verify ownership via planet
+  const { data: sourcePlanet } = await supabase.from('planets').select('id, player_id').eq('id', mission.planet_id).single()
+  if (!sourcePlanet || sourcePlanet.player_id !== userId) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const now = new Date()
+  if (new Date(mission.arrives_at) > now) return new Response(JSON.stringify({ error: 'Mission not yet arrived' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Get galaxy_planet and try to claim it (race condition guard)
+  const { data: galaxyPlanet } = await supabase.from('galaxy_planets')
+    .select('*')
+    .eq('coordinates', mission.target_coords)
+    .is('claimed_by', null)
+    .single()
+
+  if (!galaxyPlanet) {
+    // Planet was claimed by another player during transit
+    await supabase.from('missions').update({ status: 'completed', result: { success: false, reason: 'Planet already claimed by another player' } }).eq('id', missionId)
+    await supabase.from('planet_events').insert({
+      planet_id: mission.planet_id,
+      event_type: 'colonize_failed',
+      message: `Colonization of ${mission.target_name} failed — planet already claimed. Colony Ship lost.`,
+      metadata: { target_coords: mission.target_coords },
+    })
+    return new Response(JSON.stringify({ success: false, reason: 'Planet already claimed' }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Claim the planet
+  await supabase.from('galaxy_planets').update({ claimed_by: userId, claimed_at: now.toISOString() }).eq('id', galaxyPlanet.id)
+
+  // Check colonization_theory level for bonuses
+  const { data: colTech } = await supabase.from('player_technologies').select('level').eq('player_id', userId).eq('tech_id', 'colonization_theory').single()
+  const colLevel = colTech?.level ?? 1
+  const resourceBonus = 1 + (colLevel >= 2 ? 0.2 * (colLevel - 1) : 0)
+  const startingMetal = Math.floor(500 * resourceBonus)
+  const startingGas = Math.floor(200 * resourceBonus)
+  const hqLevel = colLevel >= 3 ? 2 : 1
+
+  // Create the new planet
+  const { data: newPlanet } = await supabase.from('planets').insert({
+    player_id: userId,
+    name: galaxyPlanet.name,
+    coordinates: galaxyPlanet.coordinates,
+    diameter: galaxyPlanet.diameter,
+    max_building_slots: galaxyPlanet.max_building_slots,
+    metal_amount: startingMetal,
+    gas_amount: startingGas,
+  }).select('id').single()
+
+  if (!newPlanet) {
+    return new Response(JSON.stringify({ error: 'Failed to create planet' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Initialize buildings
+  const buildingInserts = [
+    { planet_id: newPlanet.id, building_id: 'headquarters', level: hqLevel },
+    { planet_id: newPlanet.id, building_id: 'metal_mine', level: 0 },
+    { planet_id: newPlanet.id, building_id: 'gas_refinery', level: 0 },
+    { planet_id: newPlanet.id, building_id: 'solar_array', level: 1 },
+    { planet_id: newPlanet.id, building_id: 'metal_storage', level: 0 },
+    { planet_id: newPlanet.id, building_id: 'gas_storage', level: 0 },
+    { planet_id: newPlanet.id, building_id: 'weather_station', level: 0 },
+    { planet_id: newPlanet.id, building_id: 'research_lab', level: 0 },
+  ]
+  await supabase.from('planet_buildings').insert(buildingInserts)
+
+  // Initialize weather
+  await supabase.from('planet_weather').insert({ planet_id: newPlanet.id, weather_type: 'calm_skies', expires_at: null })
+
+  // Welcome event on the new planet
+  await supabase.from('planet_events').insert({
+    planet_id: newPlanet.id,
+    event_type: 'system',
+    message: 'Colony established! Your settlers begin building.',
+  })
+
+  // Mark mission as completed
+  await supabase.from('missions').update({
+    status: 'completed',
+    result: { success: true, new_planet_id: newPlanet.id, planet_name: galaxyPlanet.name },
+  }).eq('id', missionId)
+
+  // Event on source planet
+  await supabase.from('planet_events').insert({
+    planet_id: mission.planet_id,
+    event_type: 'colonize_completed',
+    message: `Colony established on ${galaxyPlanet.name}! Switch planets to manage your new colony.`,
+    metadata: { new_planet_id: newPlanet.id, planet_name: galaxyPlanet.name },
+  })
+
+  return new Response(JSON.stringify({ success: true, newPlanetId: newPlanet.id, planetName: galaxyPlanet.name }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleRenamePlanet(supabase: any, userId: string, planetId: string, newName: string, cors: Record<string, string>) {
+  if (!newName || newName.length < 2 || newName.length > 24) {
+    return new Response(JSON.stringify({ error: 'Name must be 2-24 characters' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+  if (!/^[a-zA-Z0-9 \-]+$/.test(newName)) {
+    return new Response(JSON.stringify({ error: 'Name can only contain letters, numbers, spaces, and hyphens' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const { data: planet } = await supabase.from('planets').select('id').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Check uniqueness among player's planets
+  const { data: existing } = await supabase.from('planets').select('id').eq('player_id', userId).eq('name', newName).neq('id', planetId).single()
+  if (existing) return new Response(JSON.stringify({ error: 'You already have a planet with that name' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  await supabase.from('planets').update({ name: newName }).eq('id', planetId)
+
+  return new Response(JSON.stringify({ success: true, name: newName }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// ============================================================
+// Resource Transfer handlers
+// ============================================================
+
+// deno-lint-ignore no-explicit-any
+async function handleDispatchTransfer(
+  supabase: any, userId: string, sourcePlanetId: string,
+  destinationPlanetId: string, fleet: Record<string, number>,
+  resources: { metal: number; gas: number },
+  devMode: boolean, cors: Record<string, string>
+) {
+  if (!destinationPlanetId || !fleet || !resources) {
+    return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Validate both planets belong to the same player
+  const { data: source } = await supabase.from('planets').select('id, coordinates, metal_amount, gas_amount').eq('id', sourcePlanetId).eq('player_id', userId).single()
+  if (!source) return new Response(JSON.stringify({ error: 'Source planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const { data: dest } = await supabase.from('planets').select('id, coordinates, name').eq('id', destinationPlanetId).eq('player_id', userId).single()
+  if (!dest) return new Response(JSON.stringify({ error: 'Destination planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  if (sourcePlanetId === destinationPlanetId) {
+    return new Response(JSON.stringify({ error: 'Cannot transfer to the same planet' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Validate resources
+  const metalToSend = Math.max(0, Math.floor(resources.metal ?? 0))
+  const gasToSend = Math.max(0, Math.floor(resources.gas ?? 0))
+  if (metalToSend + gasToSend === 0) {
+    return new Response(JSON.stringify({ error: 'Must send at least some resources' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+  if (metalToSend > source.metal_amount || gasToSend > source.gas_amount) {
+    return new Response(JSON.stringify({ error: 'Not enough resources' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Calculate total cargo capacity
+  let totalCapacity = 0
+  for (const [shipType, count] of Object.entries(fleet)) {
+    if (count <= 0) continue
+    const shipStats = SHIP_STATS[shipType]
+    if (!shipStats) return new Response(JSON.stringify({ error: `Unknown ship: ${shipType}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+    totalCapacity += shipStats.cargo * count
+  }
+  if (totalCapacity < metalToSend + gasToSend) {
+    return new Response(JSON.stringify({ error: 'Not enough cargo capacity' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Validate and deduct ships
+  for (const [shipType, count] of Object.entries(fleet)) {
+    if (count <= 0) continue
+    const { data: shipRow } = await supabase.from('planet_ships').select('count').eq('planet_id', sourcePlanetId).eq('ship_type', shipType).single()
+    const available = shipRow?.count ?? 0
+    if (available < count) {
+      return new Response(JSON.stringify({ error: `Not enough ${shipType} (have ${available}, need ${count})` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+    }
+    await supabase.from('planet_ships').update({ count: available - (count as number) }).eq('planet_id', sourcePlanetId).eq('ship_type', shipType)
+  }
+
+  // Deduct resources
+  await supabase.from('planets').update({
+    metal_amount: source.metal_amount - metalToSend,
+    gas_amount: source.gas_amount - gasToSend,
+  }).eq('id', sourcePlanetId)
+
+  // Calculate travel time
+  const distance = coordDistance(source.coordinates, dest.coordinates)
+  const travelSeconds = devMode ? 10 : Math.max(60, Math.floor((distance / 8) * 60))
+  const now = new Date()
+  const arrivesAt = new Date(now.getTime() + travelSeconds * 1000)
+
+  const { data: mission } = await supabase.from('missions').insert({
+    planet_id: sourcePlanetId,
+    mission_type: 'transfer',
+    status: 'in_transit',
+    target_coords: dest.coordinates,
+    target_name: dest.name,
+    fleet,
+    dispatched_at: now.toISOString(),
+    arrives_at: arrivesAt.toISOString(),
+    returns_at: arrivesAt.toISOString(), // no return — ships stay at destination
+    result: { resources: { metal: metalToSend, gas: gasToSend }, destination_planet_id: destinationPlanetId },
+  }).select('id').single()
+
+  await supabase.from('planet_events').insert({
+    planet_id: sourcePlanetId,
+    event_type: 'transfer_dispatched',
+    message: `Transport fleet sent to ${dest.name} with ${metalToSend.toLocaleString()} metal, ${gasToSend.toLocaleString()} gas`,
+    metadata: { mission_id: mission?.id, destination: dest.name },
+  })
+
+  return new Response(JSON.stringify({ success: true, missionId: mission?.id, arrivesAt: arrivesAt.toISOString() }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleResolveTransfer(supabase: any, userId: string, missionId: string, cors: Record<string, string>) {
+  const { data: mission } = await supabase.from('missions').select('*').eq('id', missionId).single()
+  if (!mission || mission.mission_type !== 'transfer') return new Response(JSON.stringify({ error: 'Mission not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Verify ownership
+  const { data: sourcePlanet } = await supabase.from('planets').select('id, player_id').eq('id', mission.planet_id).single()
+  if (!sourcePlanet || sourcePlanet.player_id !== userId) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const now = new Date()
+  if (new Date(mission.arrives_at) > now) return new Response(JSON.stringify({ error: 'Mission not yet arrived' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const transferData = mission.result as { resources: { metal: number; gas: number }; destination_planet_id: string }
+  const destPlanetId = transferData.destination_planet_id
+
+  // Verify destination still belongs to player
+  const { data: destPlanet } = await supabase.from('planets').select('id, metal_amount, gas_amount, name').eq('id', destPlanetId).eq('player_id', userId).single()
+  if (!destPlanet) return new Response(JSON.stringify({ error: 'Destination planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Add resources to destination
+  await supabase.from('planets').update({
+    metal_amount: destPlanet.metal_amount + transferData.resources.metal,
+    gas_amount: destPlanet.gas_amount + transferData.resources.gas,
+  }).eq('id', destPlanetId)
+
+  // Move ships to destination planet
+  for (const [shipType, count] of Object.entries(mission.fleet as Record<string, number>)) {
+    if (count <= 0) continue
+    const { data: existing } = await supabase.from('planet_ships').select('count').eq('planet_id', destPlanetId).eq('ship_type', shipType).single()
+    if (existing) {
+      await supabase.from('planet_ships').update({ count: existing.count + count }).eq('planet_id', destPlanetId).eq('ship_type', shipType)
+    } else {
+      await supabase.from('planet_ships').insert({ planet_id: destPlanetId, ship_type: shipType, count })
+    }
+  }
+
+  // Mark mission completed
+  await supabase.from('missions').update({
+    status: 'completed',
+    result: { ...transferData, success: true },
+  }).eq('id', missionId)
+
+  // Events on both planets
+  await supabase.from('planet_events').insert({
+    planet_id: destPlanetId,
+    event_type: 'transfer_received',
+    message: `Transport arrived with ${transferData.resources.metal.toLocaleString()} metal, ${transferData.resources.gas.toLocaleString()} gas`,
+  })
+  await supabase.from('planet_events').insert({
+    planet_id: mission.planet_id,
+    event_type: 'transfer_completed',
+    message: `Transport to ${destPlanet.name} completed successfully`,
+  })
+
+  return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }
 
 // ============================================================

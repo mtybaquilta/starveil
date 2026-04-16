@@ -106,7 +106,7 @@ export type Planet = {
   last_calculated_at: string
 }
 
-export function usePlanet() {
+export function usePlanet(selectedPlanetId: string | null) {
   const [planet, setPlanet] = useState<Planet | null>(null)
   const [buildings, setBuildings] = useState<PlanetBuilding[]>([])
   const [constructionQueue, setConstructionQueue] = useState<ConstructionItem[]>([])
@@ -124,20 +124,23 @@ export function usePlanet() {
   const [error, setError] = useState<string | null>(null)
 
   const fetchAll = useCallback(async () => {
+    if (!selectedPlanetId) return
+
     try {
+      setLoading(true)
       const { data: sessionData } = await supabase.auth.getSession()
       const playerId = sessionData.session?.user.id
 
-      const { data: planets, error: planetErr } = await supabase
+      const { data: planetData, error: planetErr } = await supabase
         .from('planets')
         .select('*')
-        .limit(1)
+        .eq('id', selectedPlanetId)
         .single()
 
       if (planetErr) throw planetErr
-      setPlanet(planets)
+      setPlanet(planetData)
 
-      const planetId = planets.id
+      const planetId = planetData.id
 
       const [
         buildingsRes, queueRes, weatherRes, eventsRes,
@@ -222,7 +225,7 @@ export function usePlanet() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedPlanetId])
 
   useEffect(() => {
     fetchAll()

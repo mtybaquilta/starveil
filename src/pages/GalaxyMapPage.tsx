@@ -65,6 +65,21 @@ function DebrisTile() {
   )
 }
 
+function HabitablePlanetTile() {
+  return (
+    <div
+      className="w-[28px] h-[28px] rounded-full relative overflow-hidden"
+      style={{
+        background: 'radial-gradient(circle at 35% 35%, #34d399 0%, #059669 40%, #064e3b 80%)',
+        boxShadow: '0 0 12px rgba(52,211,153,0.3)',
+      }}
+    >
+      <div className="absolute w-[8px] h-[3px] bg-emerald-300/40 rounded-full top-[25%] left-[20%] -rotate-[15deg]" />
+      <div className="absolute w-[10px] h-[3px] bg-emerald-400/25 rounded-full top-[55%] left-[40%] rotate-[10deg]" />
+    </div>
+  )
+}
+
 function LocationNode({
   entry,
   homeCoords,
@@ -82,16 +97,19 @@ function LocationNode({
 
   const tileClasses = isDetected
     ? 'w-[36px] h-[36px] rounded-full border-[1.5px] border-dashed border-yellow-500/35 bg-yellow-500/[0.04]'
-    : type === 'asteroid_field'
-      ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-amber-500/15 bg-gradient-to-br from-stone-500/25 to-stone-700/35'
-      : type === 'bandit_camp'
-        ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-red-500/20 bg-gradient-to-br from-red-900/25 to-red-950/30'
-        : type === 'debris_field'
-          ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-slate-400/12 bg-gradient-to-br from-slate-600/30 to-slate-800/45'
-          : 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-slate-700/20 bg-slate-800/30'
+    : type === 'habitable_planet'
+      ? 'w-[50px] h-[50px] rounded-full border-[1.5px] border-emerald-500/25 bg-gradient-to-br from-emerald-900/20 to-emerald-950/30'
+      : type === 'asteroid_field'
+        ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-amber-500/15 bg-gradient-to-br from-stone-500/25 to-stone-700/35'
+        : type === 'bandit_camp'
+          ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-red-500/20 bg-gradient-to-br from-red-900/25 to-red-950/30'
+          : type === 'debris_field'
+            ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-slate-400/12 bg-gradient-to-br from-slate-600/30 to-slate-800/45'
+            : 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-slate-700/20 bg-slate-800/30'
 
   const labelColor = isDetected
     ? 'text-yellow-500/45'
+    : type === 'habitable_planet' ? 'text-emerald-400'
     : type === 'asteroid_field' ? 'text-amber-400'
     : type === 'bandit_camp' ? 'text-red-400'
     : type === 'debris_field' ? 'text-slate-400'
@@ -112,6 +130,7 @@ function LocationNode({
         {isDetected && (
           <span className="text-[15px] text-yellow-500/50 font-bold animate-pulse">?</span>
         )}
+        {!isDetected && type === 'habitable_planet' && <HabitablePlanetTile />}
         {!isDetected && type === 'asteroid_field' && <AsteroidTile />}
         {!isDetected && type === 'bandit_camp' && <BanditTile />}
         {!isDetected && type === 'debris_field' && <DebrisTile />}
@@ -169,6 +188,7 @@ function Minimap({
   const dotColor = (entry: GalaxyMapEntry) => {
     if (entry.visibility === 'detected') return 'bg-yellow-500/40'
     switch (entry.location_type) {
+      case 'habitable_planet': return 'bg-emerald-400'
       case 'asteroid_field': return 'bg-amber-400'
       case 'bandit_camp': return 'bg-red-500'
       case 'debris_field': return 'bg-slate-500'
@@ -223,33 +243,40 @@ function DetailPanel({
   entry,
   sending,
   probeCount,
+  colonyShipCount,
   onSendProbe,
   onNavigateMission,
+  onColonize,
   onDeselect,
 }: {
   entry: GalaxyMapEntry
   sending: boolean
   probeCount: number
+  colonyShipCount: number
   onSendProbe: (coords: string) => void
   onNavigateMission: (coords: string, type: string) => void
+  onColonize: (coords: string) => void
   onDeselect: () => void
 }) {
   const isDetected = entry.visibility === 'detected'
   const type = entry.location_type
   const meta = entry.metadata as Record<string, unknown>
 
-  const typeLabel = type === 'asteroid_field' ? 'Asteroid Field'
+  const typeLabel = type === 'habitable_planet' ? 'Habitable Planet'
+    : type === 'asteroid_field' ? 'Asteroid Field'
     : type === 'bandit_camp' ? 'Bandit Camp'
     : type === 'debris_field' ? 'Debris Field'
     : 'Unknown'
 
   const titleColor = isDetected ? 'text-yellow-500/80'
+    : type === 'habitable_planet' ? 'text-emerald-400'
     : type === 'asteroid_field' ? 'text-amber-400'
     : type === 'bandit_camp' ? 'text-red-400'
     : type === 'debris_field' ? 'text-slate-300'
     : 'text-slate-400'
 
   const badgeBg = isDetected ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-600'
+    : type === 'habitable_planet' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
     : type === 'asteroid_field' ? 'bg-amber-500/10 border-amber-500/20 text-amber-600'
     : type === 'bandit_camp' ? 'bg-red-500/10 border-red-500/20 text-red-600'
     : type === 'debris_field' ? 'bg-slate-400/10 border-slate-400/15 text-slate-500'
@@ -257,13 +284,15 @@ function DetailPanel({
 
   const description = isDetected
     ? 'A faint signal detected at these coordinates. Send a probe to reveal what lies here.'
-    : type === 'asteroid_field'
-      ? 'A cluster of mineral-rich asteroids. Send a mining fleet to extract resources.'
-      : type === 'bandit_camp'
-        ? `A ${(meta?.size as string) ?? 'unknown'} bandit encampment. Raid it for resources, but expect armed resistance.`
-        : type === 'debris_field'
-          ? 'Wreckage from a past battle. Deploy cargo ships to salvage valuable materials.'
-          : ''
+    : type === 'habitable_planet'
+      ? 'A habitable world ready for colonization. Send a Colony Ship to establish a new colony.'
+      : type === 'asteroid_field'
+        ? 'A cluster of mineral-rich asteroids. Send a mining fleet to extract resources.'
+        : type === 'bandit_camp'
+          ? `A ${(meta?.size as string) ?? 'unknown'} bandit encampment. Raid it for resources, but expect armed resistance.`
+          : type === 'debris_field'
+            ? 'Wreckage from a past battle. Deploy cargo ships to salvage valuable materials.'
+            : ''
 
   const size = (meta?.size as string) ?? 'medium'
   const threat = size === 'small' ? 'Low' : size === 'medium' ? 'Medium' : 'High'
@@ -287,6 +316,18 @@ function DetailPanel({
           </div>
           <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">{description}</p>
           <div className="flex gap-5 mt-2.5">
+            {!isDetected && type === 'habitable_planet' && (
+              <>
+                <div>
+                  <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Diameter</div>
+                  <div className="text-[13px] font-semibold text-emerald-400">{((meta?.diameter as number) ?? 12400).toLocaleString()} km</div>
+                </div>
+                <div>
+                  <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Building Slots</div>
+                  <div className="text-[13px] font-semibold text-emerald-400">{(meta?.max_building_slots as number) ?? 12}</div>
+                </div>
+              </>
+            )}
             {!isDetected && type === 'asteroid_field' && (
               <div>
                 <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Richness</div>
@@ -333,6 +374,16 @@ function DetailPanel({
               style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.35), rgba(180,130,6,0.45))' }}
             >
               {sending ? 'Sending...' : probeCount === 0 ? 'No Probes' : 'Send Probe'}
+            </button>
+          )}
+          {!isDetected && type === 'habitable_planet' && (
+            <button
+              onClick={() => onColonize(entry.coordinates)}
+              disabled={sending || colonyShipCount === 0}
+              className="w-full py-2 text-[11px] font-semibold rounded-lg text-white disabled:opacity-40 transition-colors"
+              style={{ background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 2px 8px rgba(5,150,105,0.25)' }}
+            >
+              {sending ? 'Dispatching...' : colonyShipCount === 0 ? 'No Colony Ship' : 'Send Colony Ship'}
             </button>
           )}
           {!isDetected && type === 'asteroid_field' && (
@@ -408,34 +459,46 @@ function MissionDot({
   mission,
   homeCoords,
 }: {
-  mission: { id: string; mission_type: string; target_coords: string; dispatched_at: string; returns_at: string }
+  mission: { id: string; mission_type: string; target_coords: string; dispatched_at: string; arrives_at?: string; returns_at: string }
   homeCoords: string
 }) {
   const dispatched = new Date(mission.dispatched_at).getTime()
   const returns = new Date(mission.returns_at).getTime()
+  const arrives = mission.arrives_at ? new Date(mission.arrives_at).getTime() : (dispatched + returns) / 2
   const now = Date.now()
-  const total = returns - dispatched
-  const progress = Math.min(1, Math.max(0, (now - dispatched) / total))
+  const isOneWay = mission.mission_type === 'colonize' || mission.mission_type === 'transfer'
 
   const targetPos = coordsToPosition(mission.target_coords, homeCoords)
 
   let x: number, y: number
-  if (progress <= 0.5) {
-    const t = progress * 2
-    x = HOME_X + (targetPos.x - HOME_X) * t
-    y = HOME_Y + (targetPos.y - HOME_Y) * t
+  if (isOneWay) {
+    // One-way trip: dispatched → arrives
+    const total = arrives - dispatched
+    const progress = Math.min(1, Math.max(0, (now - dispatched) / total))
+    x = HOME_X + (targetPos.x - HOME_X) * progress
+    y = HOME_Y + (targetPos.y - HOME_Y) * progress
   } else {
-    const t = (progress - 0.5) * 2
-    x = targetPos.x + (HOME_X - targetPos.x) * t
-    y = targetPos.y + (HOME_Y - targetPos.y) * t
+    const total = returns - dispatched
+    const progress = Math.min(1, Math.max(0, (now - dispatched) / total))
+    if (progress <= 0.5) {
+      const t = progress * 2
+      x = HOME_X + (targetPos.x - HOME_X) * t
+      y = HOME_Y + (targetPos.y - HOME_Y) * t
+    } else {
+      const t = (progress - 0.5) * 2
+      x = targetPos.x + (HOME_X - targetPos.x) * t
+      y = targetPos.y + (HOME_Y - targetPos.y) * t
+    }
   }
 
   const color = mission.mission_type === 'mining' ? '#f59e0b'
     : mission.mission_type === 'raid' ? '#ef4444'
+    : mission.mission_type === 'colonize' ? '#34d399'
     : '#22d3ee'
 
   const glowColor = mission.mission_type === 'mining' ? 'rgba(245,158,11,0.4)'
     : mission.mission_type === 'raid' ? 'rgba(239,68,68,0.4)'
+    : mission.mission_type === 'colonize' ? 'rgba(52,211,153,0.4)'
     : 'rgba(34,211,238,0.4)'
 
   return (
@@ -619,6 +682,23 @@ export function GalaxyMapPage() {
     }
   }
 
+  const handleColonize = async (coords: string) => {
+    setSending(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('game-action', {
+        body: { action: 'dispatch_colonize', planetId: planet.id, targetCoords: coords },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      await refetch()
+      setSelected(null)
+    } catch (err) {
+      console.error('Failed to dispatch colonization:', err)
+    } finally {
+      setSending(false)
+    }
+  }
+
   const handleSearch = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return
     const target = searchCoords.trim()
@@ -746,6 +826,7 @@ export function GalaxyMapPage() {
               const pos = coordsToPosition(mission.target_coords, planet.coordinates)
               const color = mission.mission_type === 'mining' ? 'rgba(245,158,11,0.2)'
                 : mission.mission_type === 'raid' ? 'rgba(239,68,68,0.2)'
+                : mission.mission_type === 'colonize' ? 'rgba(52,211,153,0.2)'
                 : 'rgba(34,211,238,0.2)'
               return (
                 <line
@@ -838,8 +919,10 @@ export function GalaxyMapPage() {
             entry={selected}
             sending={sending}
             probeCount={shipFleet.find((s) => s.ship_type === 'probe')?.count ?? 0}
+            colonyShipCount={shipFleet.find((s) => s.ship_type === 'colony_ship')?.count ?? 0}
             onSendProbe={handleSendProbe}
             onNavigateMission={(coords, type) => navigate(`/missions?target=${coords}&type=${type}`)}
+            onColonize={handleColonize}
             onDeselect={() => setSelected(null)}
           />
         )}

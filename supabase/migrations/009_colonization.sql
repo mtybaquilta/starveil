@@ -1,0 +1,80 @@
+-- Galaxy Planets: pre-seeded habitable planets at fixed coordinates
+create table galaxy_planets (
+  id uuid primary key default gen_random_uuid(),
+  coordinates text unique not null,
+  name text not null,
+  diameter integer not null default 12400,
+  max_building_slots integer not null default 12,
+  claimed_by uuid references players(id) null,
+  claimed_at timestamptz null
+);
+
+-- No RLS — only accessed by edge functions via service role
+
+-- Allow planets table inserts from edge function (for colonization)
+-- The existing RLS only allows select/update for own planets.
+-- Inserts happen via service_role in the edge function, so no policy needed.
+
+-- Seed ~60 habitable planets spread across the galaxy
+-- Galaxy 1, systems 1-500, positions 1-15
+insert into galaxy_planets (coordinates, name) values
+  ('1:12:7',   'Verdant Prime'),
+  ('1:23:3',   'New Eden'),
+  ('1:41:11',  'Elysium'),
+  ('1:58:5',   'Arcadia'),
+  ('1:67:9',   'Solace'),
+  ('1:79:2',   'Haven'),
+  ('1:88:14',  'Terraform Alpha'),
+  ('1:95:6',   'Oasis'),
+  ('1:107:10', 'Serenity'),
+  ('1:118:1',  'Gaia Minor'),
+  ('1:129:8',  'Prosperity'),
+  ('1:142:12', 'Avalon'),
+  ('1:155:4',  'Refuge'),
+  ('1:163:13', 'Nova Terra'),
+  ('1:178:7',  'Meridian'),
+  ('1:189:2',  'Frontier'),
+  ('1:201:9',  'Horizon'),
+  ('1:215:5',  'Dawn'),
+  ('1:228:11', 'Zenith'),
+  ('1:237:3',  'Pinnacle'),
+  ('1:249:14', 'Bastion'),
+  ('1:261:6',  'Citadel'),
+  ('1:274:10', 'Forge'),
+  ('1:285:1',  'Nexus'),
+  ('1:298:8',  'Spire'),
+  ('1:307:12', 'Aegis'),
+  ('1:319:4',  'Beacon'),
+  ('1:332:13', 'Summit'),
+  ('1:345:7',  'Crest'),
+  ('1:356:2',  'Anchor'),
+  ('1:368:9',  'Rampart'),
+  ('1:379:5',  'Sentinel'),
+  ('1:391:11', 'Vanguard'),
+  ('1:402:3',  'Outpost Zeta'),
+  ('1:415:14', 'Dominion'),
+  ('1:427:6',  'Threshold'),
+  ('1:438:10', 'Waypoint'),
+  ('1:449:1',  'Harbinger'),
+  ('1:461:8',  'Crucible'),
+  ('1:472:12', 'Paragon'),
+  ('1:483:4',  'Eclipse'),
+  ('1:494:13', 'Terminus'),
+  ('1:15:9',   'Evergreen'),
+  ('1:36:6',   'Windfall'),
+  ('1:52:14',  'Starfall'),
+  ('1:73:3',   'Frostbloom'),
+  ('1:101:11', 'Ironheart'),
+  ('1:134:5',  'Goldvein'),
+  ('1:167:2',  'Silverpeak'),
+  ('1:198:8',  'Coppershore'),
+  ('1:231:12', 'Dustmere'),
+  ('1:264:4',  'Flamecrest'),
+  ('1:297:13', 'Stormwatch'),
+  ('1:330:7',  'Tidecaller'),
+  ('1:363:1',  'Ashvale'),
+  ('1:396:9',  'Emberveil'),
+  ('1:429:5',  'Moonrise'),
+  ('1:462:11', 'Sundrift'),
+  ('1:490:2',  'Nightfall'),
+  ('1:499:10', 'Last Light');

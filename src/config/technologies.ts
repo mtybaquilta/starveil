@@ -149,6 +149,21 @@ export const TECHNOLOGIES: TechConfig[] = [
     prerequisites: [{ techId: 'long_range_sensors', level: 4 }],
     bonuses: [{ type: 'percentage', stat: 'scan_detail', valuePerLevel: 20, description: '+20% scan detail per level' }],
   },
+  {
+    id: 'colonization_theory',
+    name: 'Colonization Theory',
+    lore: 'The science of seeding life on barren worlds — atmosphere processors, biodome engineering, and frontier logistics.',
+    branch: 'exploration',
+    maxLevel: 3,
+    baseCost: { metal: 5000, gas: 4000 },
+    baseTimeSeconds: 1800,
+    requiredLabLevel: 6,
+    prerequisites: [{ techId: 'advanced_cartography', level: 3 }],
+    bonuses: [
+      { type: 'unlock', stat: 'ship_colony_ship', valuePerLevel: 0, unlockAtLevel: 1, description: 'Lv.1: Unlocks Colony Ship' },
+      { type: 'percentage', stat: 'colony_starting_resources', valuePerLevel: 20, description: '+20% colony starting resources per level' },
+    ],
+  },
   // --- Energy ---
   {
     id: 'solar_efficiency',

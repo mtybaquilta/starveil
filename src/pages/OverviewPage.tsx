@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { PlanetVisual } from '../components/PlanetVisual'
 import { BuildingCard } from '../components/BuildingCard'
 import { EventTimeline } from '../components/EventTimeline'
@@ -25,7 +27,28 @@ function isBuildingUnlocked(
 }
 
 export function OverviewPage() {
-  const { planet, buildings, weather, events } = useOutletContext<GameContext>()
+  const { planet, buildings, weather, events, refetch } = useOutletContext<GameContext>()
+  const [editing, setEditing] = useState(false)
+  const [nameInput, setNameInput] = useState(planet.name)
+  const [renameError, setRenameError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const handleRename = async () => {
+    const trimmed = nameInput.trim()
+    if (trimmed === planet.name) { setEditing(false); return }
+    setSaving(true)
+    setRenameError(null)
+    const { data, error } = await supabase.functions.invoke('game-action', {
+      body: { action: 'rename_planet', planetId: planet.id, newName: trimmed },
+    })
+    setSaving(false)
+    if (error || data?.error) {
+      setRenameError(data?.error ?? error?.message ?? 'Rename failed')
+      return
+    }
+    setEditing(false)
+    refetch()
+  }
 
   const buildingLevels = new Map(buildings.map((b) => [b.building_id, b.level]))
   const usedSlots = buildings.filter((b) => b.level > 0).length
@@ -34,7 +57,42 @@ export function OverviewPage() {
     <div>
       {/* Planet Header */}
       <div className="mb-5">
-        <h1 className="text-lg font-bold text-slate-100">{planet.name}</h1>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') { setEditing(false); setNameInput(planet.name) } }}
+              maxLength={24}
+              className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-lg font-bold text-slate-100 outline-none focus:border-cyan-500"
+            />
+            <button
+              onClick={handleRename}
+              disabled={saving}
+              className="text-xs px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {saving ? '...' : 'Save'}
+            </button>
+            <button
+              onClick={() => { setEditing(false); setNameInput(planet.name); setRenameError(null) }}
+              className="text-xs px-2 py-1 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              Cancel
+            </button>
+            {renameError && <span className="text-xs text-red-400">{renameError}</span>}
+          </div>
+        ) : (
+          <h1
+            className="text-lg font-bold text-slate-100 cursor-pointer hover:text-cyan-300 transition-colors inline-flex items-center gap-1.5 group"
+            onClick={() => { setNameInput(planet.name); setEditing(true) }}
+          >
+            {planet.name}
+            <svg className="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </h1>
+        )}
         <p className="text-xs text-slate-500 mt-0.5">
           Temperate · Diameter: {planet.diameter.toLocaleString()} km · Slots: {usedSlots}/{planet.max_building_slots} used
           {(() => {

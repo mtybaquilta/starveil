@@ -7,6 +7,8 @@ import destroyerImg from '../assets/ships/destroyer.jpg'
 import harvesterImg from '../assets/ships/harvester.jpg'
 import smallCargoImg from '../assets/ships/small_cargo.jpg'
 import largeCargoImg from '../assets/ships/large_cargo.jpg'
+// colony_ship uses placeholder until a real asset is generated
+const colonyShipImg = largeCargoImg
 
 export type ShipId =
   | 'probe'
@@ -18,6 +20,7 @@ export type ShipId =
   | 'harvester'
   | 'small_cargo'
   | 'large_cargo'
+  | 'colony_ship'
 
 export type ShipConfig = {
   id: ShipId
@@ -134,7 +137,19 @@ export const SHIPS: ShipConfig[] = [
     requiredTech: { techId: 'capital_ship_engineering', level: 5 },
     image: destroyerImg,
     icon: '☠️',
-  }
+  },
+  {
+    id: 'colony_ship',
+    name: 'Colony Ship',
+    description: 'A massive vessel carrying everything needed to establish a new colony. Consumed on arrival.',
+    cost: { metal: 20000, gas: 15000 },
+    baseBuildTimeSeconds: 7200,
+    stats: { speed: 3, cargoCapacity: 0, attackPower: 0, defenseRating: 50, miningYield: 0 },
+    requiredShipyardLevel: 8,
+    requiredTech: { techId: 'colonization_theory', level: 1 },
+    image: colonyShipImg,
+    icon: '🌍',
+  },
 ]
 
 const SHIP_MAP = new Map(SHIPS.map((s) => [s.id, s]))

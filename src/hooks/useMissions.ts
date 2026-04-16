@@ -10,12 +10,15 @@ export function useMissions(
 ) {
   const resolvingRef = useRef<Set<string>>(new Set())
 
-  const resolveMission = useCallback(async (missionId: string) => {
+  const resolveMission = useCallback(async (missionId: string, missionType: string) => {
     if (!planetId || resolvingRef.current.has(missionId)) return
     resolvingRef.current.add(missionId)
     try {
+      const action = missionType === 'colonize' ? 'resolve_colonize'
+        : missionType === 'transfer' ? 'resolve_transfer'
+        : 'resolve_mission'
       await supabase.functions.invoke('game-action', {
-        body: { action: 'resolve_mission', planetId, missionId },
+        body: { action, planetId, missionId },
       })
       onComplete()
     } catch (err) {
@@ -31,8 +34,13 @@ export function useMissions(
     const interval = setInterval(() => {
       const now = Date.now()
       for (const mission of missions) {
-        if (mission.status !== 'completed' && new Date(mission.returns_at).getTime() <= now) {
-          resolveMission(mission.id)
+        if (mission.status === 'completed') continue
+        const isOneWay = mission.mission_type === 'colonize' || mission.mission_type === 'transfer'
+        const resolveTime = isOneWay
+          ? new Date(mission.arrives_at).getTime()
+          : new Date(mission.returns_at).getTime()
+        if (resolveTime <= now) {
+          resolveMission(mission.id, mission.mission_type)
         }
       }
     }, 1000)

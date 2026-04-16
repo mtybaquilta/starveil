@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { IS_DEV_MODE } from '../lib/devMode'
 import { SHIPS } from '../config/ships'
 import { formatTime } from '../hooks/useConstructionQueue'
 import { getTechBonuses } from '../lib/techBonuses'
 import type { GameContext } from '../components/Layout'
 
 export function FleetPage() {
-  const { planet, shipFleet, activeShipBuild, shipBuildQueue, shipTimeRemaining, activeMissions, refetch, technologies } = useOutletContext<GameContext>()
+  const { planet, shipFleet, activeShipBuild, shipBuildQueue, shipTimeRemaining, activeMissions, refetch, technologies, planets } = useOutletContext<GameContext>()
   const techBonuses = getTechBonuses(technologies)
   const navigate = useNavigate()
 
+  const [showTransfer, setShowTransfer] = useState(false)
   const fleetCounts = new Map(shipFleet.map((s) => [s.ship_type, s.count]))
 
   // Compute deployed ships from active missions
@@ -102,6 +104,27 @@ export function FleetPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Transfer button */}
+      {planets.length > 1 && (
+        <button
+          onClick={() => setShowTransfer((s) => !s)}
+          className="w-full py-3 text-sm font-medium rounded-lg bg-emerald-600/15 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-600/25 transition-colors cursor-pointer"
+        >
+          {showTransfer ? 'Hide Transfer Panel' : 'Transfer Resources to Another Planet'}
+        </button>
+      )}
+
+      {/* Transfer Panel */}
+      {showTransfer && planets.length > 1 && (
+        <TransferPanel
+          sourcePlanet={planet}
+          planets={planets.filter((p) => p.id !== planet.id)}
+          shipFleet={shipFleet}
+          deployedCounts={deployedCounts}
+          onComplete={refetch}
+        />
       )}
 
       {/* Ship List Rows */}
@@ -236,6 +259,153 @@ function ShipRow({
           Deploy →
         </button>
       </div>
+    </div>
+  )
+}
+
+function TransferPanel({
+  sourcePlanet,
+  planets,
+  shipFleet,
+  deployedCounts,
+  onComplete,
+}: {
+  sourcePlanet: { id: string; metal_amount: number; gas_amount: number }
+  planets: { id: string; name: string; coordinates: string }[]
+  shipFleet: { ship_type: string; count: number }[]
+  deployedCounts: Map<string, number>
+  onComplete: () => Promise<void>
+}) {
+  const [destId, setDestId] = useState(planets[0]?.id ?? '')
+  const [metal, setMetal] = useState(0)
+  const [gas, setGas] = useState(0)
+  const [fleetSelection, setFleetSelection] = useState<Record<string, number>>({})
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const cargoShips = SHIPS.filter((s) => s.stats.cargoCapacity > 0)
+  const totalCapacity = Object.entries(fleetSelection).reduce((sum, [shipType, count]) => {
+    const ship = SHIPS.find((s) => s.id === shipType)
+    return sum + (ship?.stats.cargoCapacity ?? 0) * count
+  }, 0)
+  const totalResources = metal + gas
+  const overCapacity = totalResources > totalCapacity
+
+  const handleSend = async () => {
+    setSending(true)
+    setError(null)
+    try {
+      const { data, error: err } = await supabase.functions.invoke('game-action', {
+        body: {
+          action: 'dispatch_transfer',
+          planetId: sourcePlanet.id,
+          destinationPlanetId: destId,
+          fleet: fleetSelection,
+          resources: { metal, gas },
+          devMode: IS_DEV_MODE,
+        },
+      })
+      if (err) throw err
+      if (data?.error) throw new Error(data.error)
+      setMetal(0)
+      setGas(0)
+      setFleetSelection({})
+      await onComplete()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="bg-slate-800/40 rounded-xl p-5 border border-emerald-700/20 space-y-4">
+      <h2 className="text-sm font-semibold text-emerald-400">Transfer Resources</h2>
+
+      {/* Destination */}
+      <div>
+        <label className="text-[10px] text-slate-500 uppercase tracking-wide block mb-1">Destination</label>
+        <select
+          value={destId}
+          onChange={(e) => setDestId(e.target.value)}
+          className="w-full bg-slate-900 border border-slate-700/40 rounded px-3 py-2 text-sm text-slate-200 focus:border-emerald-500/40 focus:outline-none"
+        >
+          {planets.map((p) => (
+            <option key={p.id} value={p.id}>{p.name} ({p.coordinates})</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Resources */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-[10px] text-slate-500 uppercase tracking-wide block mb-1">
+            Metal <span className="text-slate-600">(max {Math.floor(sourcePlanet.metal_amount).toLocaleString()})</span>
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={Math.floor(sourcePlanet.metal_amount)}
+            value={metal}
+            onChange={(e) => setMetal(Math.max(0, Math.min(Math.floor(sourcePlanet.metal_amount), Number(e.target.value) || 0)))}
+            className="w-full bg-slate-900 border border-slate-700/40 rounded px-3 py-2 text-sm text-orange-400 focus:border-emerald-500/40 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-slate-500 uppercase tracking-wide block mb-1">
+            Gas <span className="text-slate-600">(max {Math.floor(sourcePlanet.gas_amount).toLocaleString()})</span>
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={Math.floor(sourcePlanet.gas_amount)}
+            value={gas}
+            onChange={(e) => setGas(Math.max(0, Math.min(Math.floor(sourcePlanet.gas_amount), Number(e.target.value) || 0)))}
+            className="w-full bg-slate-900 border border-slate-700/40 rounded px-3 py-2 text-sm text-violet-400 focus:border-emerald-500/40 focus:outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Fleet selection */}
+      <div>
+        <label className="text-[10px] text-slate-500 uppercase tracking-wide block mb-1">
+          Cargo Fleet <span className={overCapacity ? 'text-red-400' : 'text-emerald-400'}>(capacity: {totalCapacity.toLocaleString()} / need: {totalResources.toLocaleString()})</span>
+        </label>
+        <div className="space-y-1.5">
+          {cargoShips.map((ship) => {
+            const total = shipFleet.find((s) => s.ship_type === ship.id)?.count ?? 0
+            const deployed = deployedCounts.get(ship.id) ?? 0
+            const available = total - deployed
+            const selected = fleetSelection[ship.id] ?? 0
+            if (available === 0 && selected === 0) return null
+            return (
+              <div key={ship.id} className="flex items-center gap-3">
+                <span className="text-xs text-slate-300 min-w-[100px]">{ship.name}</span>
+                <span className="text-[10px] text-slate-500">({available} available)</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={available}
+                  value={selected}
+                  onChange={(e) => setFleetSelection((f) => ({ ...f, [ship.id]: Math.max(0, Math.min(available, Number(e.target.value) || 0)) }))}
+                  className="w-16 bg-slate-900 border border-slate-700/40 rounded px-2 py-1 text-xs text-slate-200 focus:border-emerald-500/40 focus:outline-none"
+                />
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {error && <div className="text-xs text-red-400">{error}</div>}
+
+      <button
+        onClick={handleSend}
+        disabled={sending || totalResources === 0 || overCapacity || totalCapacity === 0}
+        className="w-full py-2.5 text-sm font-semibold rounded-lg text-white disabled:opacity-40 transition-colors cursor-pointer"
+        style={{ background: 'linear-gradient(135deg, #059669, #047857)' }}
+      >
+        {sending ? 'Sending...' : 'Send Transfer'}
+      </button>
     </div>
   )
 }

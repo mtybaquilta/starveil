@@ -96,7 +96,7 @@ export function ResourceBar({
   const impact = weatherImpactSummary(weatherMetalMultiplier, weatherGasMultiplier, weatherStationLevel)
 
   return (
-    <div className="flex items-center px-5 py-2.5 bg-slate-950/90 border-b border-slate-800/50">
+    <div className="flex items-center px-5 py-2.5 flex-1">
       <div className="text-sm font-bold text-slate-100 mr-6 tracking-wide">STARVEIL: Interstellar Siege</div>
 
       <div className="flex gap-5 flex-1">
