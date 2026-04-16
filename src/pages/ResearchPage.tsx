@@ -15,6 +15,38 @@ const BRANCH_LABELS: Record<TechBranch, string> = {
 
 const BRANCHES: TechBranch[] = ['military', 'economy', 'exploration', 'energy']
 
+const BRANCH_ICONS: Record<TechBranch, JSX.Element> = {
+  military: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+      <path d="M12 2l3 7h7l-5.5 4.5 2 7L12 16l-6.5 4.5 2-7L2 9h7z" />
+    </svg>
+  ),
+  economy: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+      <circle cx="12" cy="12" r="4" />
+    </svg>
+  ),
+  exploration: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36z" />
+    </svg>
+  ),
+  energy: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+    </svg>
+  ),
+}
+
+const BRANCH_COLORS: Record<TechBranch, string> = {
+  military: 'text-red-400',
+  economy: 'text-amber-400',
+  exploration: 'text-cyan-400',
+  energy: 'text-yellow-400',
+}
+
 function formatTime(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)}s`
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`
@@ -141,7 +173,7 @@ function ResearchPageInner({
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
               {researchTimeRemaining !== null && researchTimeRemaining > 0
-                ? formatTime(researchTimeRemaining)
+                ? formatTime(researchTimeRemaining / 1000)
                 : 'Completing...'}
             </div>
           </div>
@@ -179,6 +211,9 @@ function ResearchPageInner({
               key={tech.id}
               className="bg-slate-900/40 border border-slate-800/40 rounded-lg p-3 flex items-start gap-3"
             >
+              <div className={`flex-shrink-0 mt-0.5 ${BRANCH_COLORS[tech.branch]} opacity-60`}>
+                {BRANCH_ICONS[tech.branch]}
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-slate-200">{tech.name}</span>
@@ -186,7 +221,8 @@ function ResearchPageInner({
                     Lv.{currentLevel}/{tech.maxLevel}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-0.5">{tech.bonuses.map((b) => b.description).join(' · ')}</p>
+                <p className="text-[10px] italic text-slate-400 mt-0.5 leading-relaxed">{tech.lore}</p>
+                <p className="text-[10px] text-slate-500 mt-1">{tech.bonuses.map((b) => b.description).join(' · ')}</p>
                 {cost && (
                   <div className="flex gap-3 mt-1 text-[10px] text-slate-500">
                     <span>⚙️ {Math.round(cost.metal).toLocaleString()} metal</span>

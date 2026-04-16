@@ -42,7 +42,7 @@ export function useResearchQueue(
     if (!activeResearch) return
 
     const interval = setInterval(() => {
-      const remaining = new Date(activeResearch.completes_at).getTime() / 1000 - Date.now() / 1000
+      const remaining = new Date(activeResearch.completes_at).getTime() - Date.now()
       if (remaining <= 0) {
         setTimeRemaining(0)
         clearInterval(interval)

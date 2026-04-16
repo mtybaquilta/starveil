@@ -11,6 +11,7 @@ export type TechBonus = {
 export type TechConfig = {
   id: string
   name: string
+  lore: string
   branch: TechBranch
   maxLevel: number
   baseCost: { metal: number; gas: number }
@@ -25,6 +26,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'reinforced_hulls',
     name: 'Reinforced Hulls',
+    lore: 'Composite alloys forged in zero-gravity foundries, layered for maximum deflection.',
     branch: 'military',
     maxLevel: 10,
     baseCost: { metal: 400, gas: 200 },
@@ -36,6 +38,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'advanced_weapons',
     name: 'Advanced Weapons',
+    lore: 'Plasma-tipped warheads and targeting AI that predicts evasion patterns before they happen.',
     branch: 'military',
     maxLevel: 10,
     baseCost: { metal: 500, gas: 300 },
@@ -47,6 +50,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'capital_ship_engineering',
     name: 'Capital Ship Engineering',
+    lore: 'Massive hull frameworks and reactor cores that make city-sized warships a reality.',
     branch: 'military',
     maxLevel: 5,
     baseCost: { metal: 2000, gas: 1500 },
@@ -63,6 +67,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'efficient_refining',
     name: 'Efficient Refining',
+    lore: 'Nano-catalytic smelters that extract every trace of usable ore from raw rock.',
     branch: 'economy',
     maxLevel: 10,
     baseCost: { metal: 300, gas: 150 },
@@ -74,6 +79,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'deep_core_mining',
     name: 'Deep Core Mining',
+    lore: 'Bore through planetary crust to reach mineral veins no surface operation could touch.',
     branch: 'economy',
     maxLevel: 10,
     baseCost: { metal: 500, gas: 250 },
@@ -85,6 +91,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'expanded_storage',
     name: 'Expanded Storage',
+    lore: 'Pressurized containment vaults and anti-corrosion lining that hold far more than standard silos.',
     branch: 'economy',
     maxLevel: 10,
     baseCost: { metal: 400, gas: 200 },
@@ -96,6 +103,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'rapid_extraction',
     name: 'Rapid Extraction',
+    lore: 'Superheated injection rigs that flash-vaporize gas pockets for near-instant collection.',
     branch: 'economy',
     maxLevel: 10,
     baseCost: { metal: 600, gas: 400 },
@@ -108,6 +116,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'long_range_sensors',
     name: 'Long Range Sensors',
+    lore: 'Tachyon pulse arrays that detect faint signatures across dozens of light-years.',
     branch: 'exploration',
     maxLevel: 10,
     baseCost: { metal: 350, gas: 250 },
@@ -119,6 +128,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'probe_durability',
     name: 'Probe Durability',
+    lore: 'Self-repairing micro-shells and radiation-hardened circuits that let probes survive hostile sectors.',
     branch: 'exploration',
     maxLevel: 5,
     baseCost: { metal: 200, gas: 100 },
@@ -130,6 +140,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'advanced_cartography',
     name: 'Advanced Cartography',
+    lore: 'Quantum-entangled mapping drones that build a living atlas of the galaxy in real time.',
     branch: 'exploration',
     maxLevel: 5,
     baseCost: { metal: 600, gas: 500 },
@@ -142,6 +153,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'solar_efficiency',
     name: 'Solar Efficiency',
+    lore: 'Photon-trapping metamaterials that harvest energy from starlight others would waste.',
     branch: 'energy',
     maxLevel: 10,
     baseCost: { metal: 300, gas: 200 },
@@ -153,6 +165,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'storm_hardening',
     name: 'Storm Hardening',
+    lore: 'Electromagnetic dampeners and surge buffers that keep the grid stable when the skies turn violent.',
     branch: 'energy',
     maxLevel: 5,
     baseCost: { metal: 800, gas: 600 },
@@ -164,6 +177,7 @@ export const TECHNOLOGIES: TechConfig[] = [
   {
     id: 'fusion_theory',
     name: 'Fusion Theory',
+    lore: 'Controlled plasma confinement that turns hydrogen into virtually limitless power.',
     branch: 'energy',
     maxLevel: 10,
     baseCost: { metal: 1000, gas: 800 },
