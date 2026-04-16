@@ -5,11 +5,11 @@ import { shipBuildTimeSeconds, BASE_METAL_PRODUCTION_PER_HOUR, BASE_GAS_PRODUCTI
 describe('ship roster', () => {
   const expectedIds = [
     'probe', 'small_fighter', 'large_fighter', 'cruiser',
-    'gunship', 'destroyer', 'harvester', 'small_cargo', 'large_cargo',
+    'gunship', 'destroyer', 'harvester', 'small_cargo', 'large_cargo', 'colony_ship',
   ]
 
-  it('has exactly 9 ships', () => {
-    expect(SHIPS).toHaveLength(9)
+  it('has exactly 10 ships', () => {
+    expect(SHIPS).toHaveLength(10)
   })
 
   it.each(expectedIds)('contains %s', (id) => {
