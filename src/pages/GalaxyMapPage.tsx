@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { IS_DEV_MODE } from '../lib/devMode'
+import { SHIPS } from '../config/ships'
 import type { GameContext } from '../components/Layout'
-import type { GalaxyMapEntry } from '../hooks/usePlanet'
+import type { GalaxyMapEntry, PlayerAttack } from '../hooks/usePlanet'
 
 const CANVAS_W = 2400
 const CANVAS_H = 1600
@@ -80,6 +82,21 @@ function HabitablePlanetTile() {
   )
 }
 
+function PlayerColonyTile() {
+  return (
+    <div
+      className="w-[28px] h-[28px] rounded-full relative overflow-hidden"
+      style={{
+        background: 'radial-gradient(circle at 35% 35%, #f87171 0%, #dc2626 40%, #7f1d1d 80%)',
+        boxShadow: '0 0 12px rgba(248,113,113,0.3)',
+      }}
+    >
+      <div className="absolute w-[8px] h-[3px] bg-red-300/40 rounded-full top-[25%] left-[20%] -rotate-[15deg]" />
+      <div className="absolute w-[10px] h-[3px] bg-red-400/25 rounded-full top-[55%] left-[40%] rotate-[10deg]" />
+    </div>
+  )
+}
+
 function LocationNode({
   entry,
   homeCoords,
@@ -99,6 +116,8 @@ function LocationNode({
     ? 'w-[36px] h-[36px] rounded-full border-[1.5px] border-dashed border-yellow-500/35 bg-yellow-500/[0.04]'
     : type === 'habitable_planet'
       ? 'w-[50px] h-[50px] rounded-full border-[1.5px] border-emerald-500/25 bg-gradient-to-br from-emerald-900/20 to-emerald-950/30'
+      : type === 'player_colony'
+        ? 'w-[50px] h-[50px] rounded-full border-[1.5px] border-red-500/25 bg-gradient-to-br from-red-900/20 to-red-950/30'
       : type === 'asteroid_field'
         ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-amber-500/15 bg-gradient-to-br from-stone-500/25 to-stone-700/35'
         : type === 'bandit_camp'
@@ -110,6 +129,7 @@ function LocationNode({
   const labelColor = isDetected
     ? 'text-yellow-500/45'
     : type === 'habitable_planet' ? 'text-emerald-400'
+    : type === 'player_colony' ? 'text-red-400'
     : type === 'asteroid_field' ? 'text-amber-400'
     : type === 'bandit_camp' ? 'text-red-400'
     : type === 'debris_field' ? 'text-slate-400'
@@ -131,6 +151,7 @@ function LocationNode({
           <span className="text-[15px] text-yellow-500/50 font-bold animate-pulse">?</span>
         )}
         {!isDetected && type === 'habitable_planet' && <HabitablePlanetTile />}
+        {!isDetected && type === 'player_colony' && <PlayerColonyTile />}
         {!isDetected && type === 'asteroid_field' && <AsteroidTile />}
         {!isDetected && type === 'bandit_camp' && <BanditTile />}
         {!isDetected && type === 'debris_field' && <DebrisTile />}
@@ -189,6 +210,7 @@ function Minimap({
     if (entry.visibility === 'detected') return 'bg-yellow-500/40'
     switch (entry.location_type) {
       case 'habitable_planet': return 'bg-emerald-400'
+      case 'player_colony': return 'bg-red-500'
       case 'asteroid_field': return 'bg-amber-400'
       case 'bandit_camp': return 'bg-red-500'
       case 'debris_field': return 'bg-slate-500'
@@ -247,6 +269,7 @@ function DetailPanel({
   onSendProbe,
   onNavigateMission,
   onColonize,
+  onAttack,
   onDeselect,
 }: {
   entry: GalaxyMapEntry
@@ -256,6 +279,7 @@ function DetailPanel({
   onSendProbe: (coords: string) => void
   onNavigateMission: (coords: string, type: string) => void
   onColonize: (coords: string) => void
+  onAttack: (coords: string) => void
   onDeselect: () => void
 }) {
   const isDetected = entry.visibility === 'detected'
@@ -263,6 +287,7 @@ function DetailPanel({
   const meta = entry.metadata as Record<string, unknown>
 
   const typeLabel = type === 'habitable_planet' ? 'Habitable Planet'
+    : type === 'player_colony' ? 'Player Colony'
     : type === 'asteroid_field' ? 'Asteroid Field'
     : type === 'bandit_camp' ? 'Bandit Camp'
     : type === 'debris_field' ? 'Debris Field'
@@ -270,6 +295,7 @@ function DetailPanel({
 
   const titleColor = isDetected ? 'text-yellow-500/80'
     : type === 'habitable_planet' ? 'text-emerald-400'
+    : type === 'player_colony' ? 'text-red-400'
     : type === 'asteroid_field' ? 'text-amber-400'
     : type === 'bandit_camp' ? 'text-red-400'
     : type === 'debris_field' ? 'text-slate-300'
@@ -277,6 +303,7 @@ function DetailPanel({
 
   const badgeBg = isDetected ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-600'
     : type === 'habitable_planet' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
+    : type === 'player_colony' ? 'bg-red-500/10 border-red-500/20 text-red-600'
     : type === 'asteroid_field' ? 'bg-amber-500/10 border-amber-500/20 text-amber-600'
     : type === 'bandit_camp' ? 'bg-red-500/10 border-red-500/20 text-red-600'
     : type === 'debris_field' ? 'bg-slate-400/10 border-slate-400/15 text-slate-500'
@@ -286,13 +313,15 @@ function DetailPanel({
     ? 'A faint signal detected at these coordinates. Send a probe to reveal what lies here.'
     : type === 'habitable_planet'
       ? 'A habitable world ready for colonization. Send a Colony Ship to establish a new colony.'
-      : type === 'asteroid_field'
-        ? 'A cluster of mineral-rich asteroids. Send a mining fleet to extract resources.'
-        : type === 'bandit_camp'
-          ? `A ${(meta?.size as string) ?? 'unknown'} bandit encampment. Raid it for resources, but expect armed resistance.`
-          : type === 'debris_field'
-            ? 'Wreckage from a past battle. Deploy cargo ships to salvage valuable materials.'
-            : ''
+      : type === 'player_colony'
+        ? `A colony belonging to ${(meta?.owner_username as string) ?? 'unknown'}. Send an attack fleet to raid their resources.`
+        : type === 'asteroid_field'
+          ? 'A cluster of mineral-rich asteroids. Send a mining fleet to extract resources.'
+          : type === 'bandit_camp'
+            ? `A ${(meta?.size as string) ?? 'unknown'} bandit encampment. Raid it for resources, but expect armed resistance.`
+            : type === 'debris_field'
+              ? 'Wreckage from a past battle. Deploy cargo ships to salvage valuable materials.'
+              : ''
 
   const size = (meta?.size as string) ?? 'medium'
   const threat = size === 'small' ? 'Low' : size === 'medium' ? 'Medium' : 'High'
@@ -327,6 +356,12 @@ function DetailPanel({
                   <div className="text-[13px] font-semibold text-emerald-400">{(meta?.max_building_slots as number) ?? 12}</div>
                 </div>
               </>
+            )}
+            {!isDetected && type === 'player_colony' && (
+              <div>
+                <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Owner</div>
+                <div className="text-[13px] font-semibold text-red-400">{(meta?.owner_username as string) ?? 'Unknown'}</div>
+              </div>
             )}
             {!isDetected && type === 'asteroid_field' && (
               <div>
@@ -374,6 +409,16 @@ function DetailPanel({
               style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.35), rgba(180,130,6,0.45))' }}
             >
               {sending ? 'Sending...' : probeCount === 0 ? 'No Probes' : 'Send Probe'}
+            </button>
+          )}
+          {!isDetected && type === 'player_colony' && (
+            <button
+              onClick={() => onAttack(entry.coordinates)}
+              disabled={sending}
+              className="w-full py-2 text-[11px] font-semibold rounded-lg text-white disabled:opacity-40 transition-colors cursor-pointer"
+              style={{ background: 'linear-gradient(135deg, #dc2626, #991b1b)', boxShadow: '0 2px 8px rgba(220,38,38,0.25)' }}
+            >
+              {sending ? 'Dispatching...' : 'Send Attack Fleet'}
             </button>
           )}
           {!isDetected && type === 'habitable_planet' && (
@@ -520,8 +565,137 @@ function MissionDot({
   )
 }
 
+function AttackDot({
+  attack,
+  homeCoords,
+  isIncoming,
+}: {
+  attack: PlayerAttack
+  homeCoords: string
+  isIncoming: boolean
+}) {
+  const dispatched = new Date(attack.dispatched_at).getTime()
+  const arrives = new Date(attack.arrives_at).getTime()
+  const now = Date.now()
+
+  const targetPos = coordsToPosition(attack.target_coordinates, homeCoords)
+
+  let x: number, y: number
+  if (attack.status === 'in_transit') {
+    const progress = Math.min(1, Math.max(0, (now - dispatched) / (arrives - dispatched)))
+    if (isIncoming) {
+      x = targetPos.x + (HOME_X - targetPos.x) * progress
+      y = targetPos.y + (HOME_Y - targetPos.y) * progress
+    } else {
+      x = HOME_X + (targetPos.x - HOME_X) * progress
+      y = HOME_Y + (targetPos.y - HOME_Y) * progress
+    }
+  } else if (attack.status === 'returning' && attack.return_arrives_at) {
+    const resolvedAt = new Date(attack.resolved_at!).getTime()
+    const returnArrives = new Date(attack.return_arrives_at).getTime()
+    const progress = Math.min(1, Math.max(0, (now - resolvedAt) / (returnArrives - resolvedAt)))
+    x = targetPos.x + (HOME_X - targetPos.x) * progress
+    y = targetPos.y + (HOME_Y - targetPos.y) * progress
+  } else {
+    return null
+  }
+
+  const color = isIncoming ? '#ef4444' : '#f97316'
+  const glowColor = isIncoming ? 'rgba(239,68,68,0.4)' : 'rgba(249,115,22,0.4)'
+
+  return (
+    <div
+      className="absolute z-[8] pointer-events-none transition-all duration-[5000ms] ease-linear"
+      style={{ left: x, top: y, transform: 'translate(-50%, -50%)' }}
+    >
+      <div
+        className="absolute inset-0 rounded-full animate-ping"
+        style={{ background: glowColor, width: 10, height: 10, margin: -2 }}
+      />
+      <div
+        className="w-[6px] h-[6px] rounded-full"
+        style={{ background: color, boxShadow: `0 0 8px ${glowColor}` }}
+      />
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 whitespace-nowrap text-[7px] font-semibold" style={{ color }}>
+        {isIncoming ? 'INCOMING' : attack.status === 'returning' ? 'RETURNING' : 'ATTACK'}
+      </div>
+    </div>
+  )
+}
+
+function AttackFleetSelector({
+  shipFleet,
+  attackFleet,
+  setAttackFleet,
+  onLaunch,
+  onCancel,
+  sending,
+  error,
+}: {
+  shipFleet: { ship_type: string; count: number }[]
+  attackFleet: Record<string, number>
+  setAttackFleet: React.Dispatch<React.SetStateAction<Record<string, number>>>
+  onLaunch: () => void
+  onCancel: () => void
+  sending: boolean
+  error: string | null
+}) {
+  const combatShips = SHIPS.filter((s) => s.stats.attackPower > 0)
+
+  return (
+    <div
+      data-clickable
+      className="absolute bottom-0 left-0 right-0 z-[30] border-t border-red-700/20 px-5 py-4 backdrop-blur-xl"
+      style={{ background: 'linear-gradient(180deg, rgba(30,10,10,0.95), rgba(15,5,5,0.98))' }}
+    >
+      <div className="text-sm font-bold text-red-400 mb-3">Select Attack Fleet</div>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        {combatShips.map((ship) => {
+          const available = shipFleet.find((s) => s.ship_type === ship.id)?.count ?? 0
+          const selected = attackFleet[ship.id] ?? 0
+          if (available === 0 && selected === 0) return null
+          return (
+            <div key={ship.id} className="flex items-center gap-2 bg-slate-800/40 rounded px-2 py-1.5">
+              <span className="text-xs text-slate-300 flex-1">{ship.name}</span>
+              <span className="text-[10px] text-slate-500">{available}</span>
+              <input
+                type="number"
+                min={0}
+                max={available}
+                value={selected}
+                onChange={(e) => setAttackFleet((f) => ({ ...f, [ship.id]: Math.max(0, Math.min(available, Number(e.target.value) || 0)) }))}
+                className="w-12 bg-slate-900 border border-slate-700/40 rounded px-1 py-0.5 text-xs text-slate-200 text-center focus:border-red-500/40 focus:outline-none"
+              />
+            </div>
+          )
+        })}
+      </div>
+      {error && <div className="text-xs text-red-400 mb-2">{error}</div>}
+      <div className="flex gap-2">
+        <button
+          onClick={onLaunch}
+          disabled={sending || Object.values(attackFleet).every((c) => c <= 0)}
+          className="flex-1 py-2 text-sm font-semibold rounded-lg text-white disabled:opacity-40 transition-colors cursor-pointer"
+          style={{ background: 'linear-gradient(135deg, #dc2626, #991b1b)' }}
+        >
+          {sending ? 'Launching...' : 'Launch Attack'}
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 bg-slate-700/30 border border-slate-600/12 rounded-lg transition-colors cursor-pointer"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function GalaxyMapPage() {
-  const { planet, galaxyMap, buildings, shipFleet, refetch, activeMissions } = useOutletContext<GameContext>()
+  const {
+    planet, galaxyMap, buildings, shipFleet, refetch, activeMissions,
+    outgoingAttacks, incomingAttacks, dispatchAttack,
+  } = useOutletContext<GameContext>()
   const navigate = useNavigate()
 
   const [camX, setCamX] = useState(0)
@@ -532,11 +706,15 @@ export function GalaxyMapPage() {
   const [sending, setSending] = useState(false)
   const [searchCoords, setSearchCoords] = useState('')
   const [searchError, setSearchError] = useState('')
+  const [attackTarget, setAttackTarget] = useState<string | null>(null)
+  const [attackFleet, setAttackFleet] = useState<Record<string, number>>({})
+  const [attackError, setAttackError] = useState<string | null>(null)
 
   const dragStart = useRef<{ x: number; y: number; camX: number; camY: number } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   const radarLevel = buildings.find((b) => b.building_id === 'radar_array')?.level ?? 0
+  const probeCount = shipFleet.find((s) => s.ship_type === 'probe')?.count ?? 0
 
   const visibleLocations = useMemo(
     () => galaxyMap.filter((e) => !e.cleared_at),
@@ -699,6 +877,58 @@ export function GalaxyMapPage() {
     }
   }
 
+  const handleScanCoordinate = async () => {
+    const coords = searchCoords.trim()
+    if (!coords) return
+    setSending(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('game-action', {
+        body: { action: 'scan_coordinate', planetId: planet.id, targetCoords: coords },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      setSearchCoords('')
+      await refetch()
+    } catch (err) {
+      setSearchError((err as Error).message)
+      setTimeout(() => setSearchError(''), 3000)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleLaunchAttack = async () => {
+    if (!attackTarget) return
+    setSending(true)
+    setAttackError(null)
+    try {
+      await dispatchAttack(attackFleet, attackTarget, IS_DEV_MODE)
+      setAttackTarget(null)
+      setAttackFleet({})
+      setSelected(null)
+    } catch (err) {
+      setAttackError((err as Error).message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleSpawnOpponent = async () => {
+    setSending(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('game-action', {
+        body: { action: 'spawn_test_opponent', planetId: planet.id, devMode: true },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      await refetch()
+    } catch (err) {
+      console.error('Failed to spawn opponent:', err)
+    } finally {
+      setSending(false)
+    }
+  }
+
   const handleSearch = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return
     const target = searchCoords.trim()
@@ -747,12 +977,28 @@ export function GalaxyMapPage() {
             )}
           </div>
           <button
+            onClick={handleScanCoordinate}
+            disabled={sending || probeCount === 0 || !searchCoords.trim()}
+            className="px-3 py-1.5 text-[10px] font-medium rounded bg-yellow-600/20 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Scan
+          </button>
+          <button
             onClick={handleRunRadar}
             disabled={radarLevel < 1 || sending}
             className="px-3 py-1.5 text-[10px] font-medium rounded bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {radarLevel < 1 ? 'Build Radar Array' : sending ? 'Scanning...' : 'Run Radar Scan'}
           </button>
+          {IS_DEV_MODE && (
+            <button
+              onClick={handleSpawnOpponent}
+              disabled={sending}
+              className="px-3 py-1.5 text-[10px] font-medium rounded bg-purple-600/20 border border-purple-500/30 text-purple-400 hover:bg-purple-600/30 disabled:opacity-40 transition-colors"
+            >
+              Spawn Opponent
+            </button>
+          )}
         </div>
       </div>
 
@@ -836,6 +1082,26 @@ export function GalaxyMapPage() {
                 />
               )
             })}
+            {outgoingAttacks.map((attack) => {
+              const pos = coordsToPosition(attack.target_coordinates, planet.coordinates)
+              return (
+                <line
+                  key={`atk-route-${attack.id}`}
+                  x1={HOME_X} y1={HOME_Y} x2={pos.x} y2={pos.y}
+                  stroke="rgba(249,115,22,0.2)" strokeWidth={1} strokeDasharray="4,4"
+                />
+              )
+            })}
+            {incomingAttacks.map((attack) => {
+              const pos = coordsToPosition(attack.target_coordinates, planet.coordinates)
+              return (
+                <line
+                  key={`def-route-${attack.id}`}
+                  x1={pos.x} y1={pos.y} x2={HOME_X} y2={HOME_Y}
+                  stroke="rgba(239,68,68,0.2)" strokeWidth={1} strokeDasharray="4,4"
+                />
+              )
+            })}
           </svg>
 
           {/* Home planet */}
@@ -848,6 +1114,14 @@ export function GalaxyMapPage() {
               mission={mission}
               homeCoords={planet.coordinates}
             />
+          ))}
+
+          {/* Attack dots */}
+          {outgoingAttacks.map((attack) => (
+            <AttackDot key={`atk-${attack.id}`} attack={attack} homeCoords={planet.coordinates} isIncoming={false} />
+          ))}
+          {incomingAttacks.map((attack) => (
+            <AttackDot key={`def-${attack.id}`} attack={attack} homeCoords={planet.coordinates} isIncoming={true} />
           ))}
 
           {/* Location nodes */}
@@ -914,16 +1188,28 @@ export function GalaxyMapPage() {
         />
 
         {/* Detail panel */}
-        {selected && (
+        {selected && !attackTarget && (
           <DetailPanel
             entry={selected}
             sending={sending}
-            probeCount={shipFleet.find((s) => s.ship_type === 'probe')?.count ?? 0}
+            probeCount={probeCount}
             colonyShipCount={shipFleet.find((s) => s.ship_type === 'colony_ship')?.count ?? 0}
             onSendProbe={handleSendProbe}
             onNavigateMission={(coords, type) => navigate(`/missions?target=${coords}&type=${type}`)}
             onColonize={handleColonize}
+            onAttack={(coords) => { setAttackTarget(coords); setAttackFleet({}); setAttackError(null) }}
             onDeselect={() => setSelected(null)}
+          />
+        )}
+        {attackTarget && (
+          <AttackFleetSelector
+            shipFleet={shipFleet}
+            attackFleet={attackFleet}
+            setAttackFleet={setAttackFleet}
+            onLaunch={handleLaunchAttack}
+            onCancel={() => { setAttackTarget(null); setAttackFleet({}); setAttackError(null) }}
+            sending={sending}
+            error={attackError}
           />
         )}
       </div>
