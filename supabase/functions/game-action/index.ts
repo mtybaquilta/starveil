@@ -87,6 +87,21 @@ Deno.serve(async (req: Request) => {
     if (action === 'resolve_transfer') {
       return await handleResolveTransfer(supabase, user.id, body.missionId, corsHeaders)
     }
+    if (action === 'scan_coordinate') {
+      return await handleScanCoordinate(supabase, user.id, planetId, body.targetCoords, corsHeaders)
+    }
+    if (action === 'attack_player') {
+      return await handleAttackPlayer(supabase, user.id, planetId, body.targetCoords, body.fleet, !!devMode, corsHeaders)
+    }
+    if (action === 'resolve_attack') {
+      return await handleResolveAttack(supabase, user.id, body.attackId, corsHeaders)
+    }
+    if (action === 'return_fleet') {
+      return await handleReturnFleet(supabase, user.id, body.attackId, corsHeaders)
+    }
+    if (action === 'spawn_test_opponent') {
+      return await handleSpawnTestOpponent(supabase, user.id, planetId, !!devMode, corsHeaders)
+    }
 
     return new Response(JSON.stringify({ error: 'Unknown action' }), {
       status: 400,
@@ -886,27 +901,42 @@ async function handleSendProbe(supabase: any, userId: string, planetId: string, 
   // Consume probe (probes are not returned — consumed on use)
   await supabase.from('planet_ships').update({ count: probeCount - 1 }).eq('planet_id', planetId).eq('ship_type', 'probe')
 
-  // Check for habitable planet at this coordinate first
-  const { data: habitablePlanet } = await supabase.from('galaxy_planets')
-    .select('id, name, diameter, max_building_slots, claimed_by')
-    .eq('coordinates', targetCoords)
-    .single()
-
   const now = new Date()
   // deno-lint-ignore no-explicit-any
   let locationType: string, name: string, metadata: Record<string, any> = {}
 
-  if (habitablePlanet && !habitablePlanet.claimed_by) {
-    locationType = 'habitable_planet'
-    name = habitablePlanet.name
-    metadata = { galaxy_planet_id: habitablePlanet.id, diameter: habitablePlanet.diameter, max_building_slots: habitablePlanet.max_building_slots }
+  // Priority 1: Check for another player's planet at this coordinate
+  const { data: otherPlanet } = await supabase.from('planets')
+    .select('id, player_id, name, coordinates')
+    .eq('coordinates', targetCoords)
+    .neq('player_id', userId)
+    .limit(1)
+    .single()
+
+  if (otherPlanet) {
+    const { data: owner } = await supabase.from('players').select('username').eq('id', otherPlanet.player_id).single()
+    locationType = 'player_colony'
+    name = otherPlanet.name
+    metadata = { owner_id: otherPlanet.player_id, owner_username: owner?.username ?? 'Unknown', planet_id: otherPlanet.id }
   } else {
-    // Roll location type and reveal
-    locationType = rollLocationType()
-    name = randomLocationName(locationType)
-    if (locationType === 'asteroid_field') metadata.richness = Math.floor(Math.random() * 5) + 1
-    if (locationType === 'bandit_camp') metadata.size = Math.random() < 0.5 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large'
-    if (locationType === 'debris_field') metadata.salvage_metal = Math.floor(Math.random() * 800 + 200)
+    // Priority 2: Check for habitable planet
+    const { data: habitablePlanet } = await supabase.from('galaxy_planets')
+      .select('id, name, diameter, max_building_slots, claimed_by')
+      .eq('coordinates', targetCoords)
+      .single()
+
+    if (habitablePlanet && !habitablePlanet.claimed_by) {
+      locationType = 'habitable_planet'
+      name = habitablePlanet.name
+      metadata = { galaxy_planet_id: habitablePlanet.id, diameter: habitablePlanet.diameter, max_building_slots: habitablePlanet.max_building_slots }
+    } else {
+      // Priority 3: Roll random location type
+      locationType = rollLocationType()
+      name = randomLocationName(locationType)
+      if (locationType === 'asteroid_field') metadata.richness = Math.floor(Math.random() * 5) + 1
+      if (locationType === 'bandit_camp') metadata.size = Math.random() < 0.5 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large'
+      if (locationType === 'debris_field') metadata.salvage_metal = Math.floor(Math.random() * 800 + 200)
+    }
   }
 
   await supabase.from('galaxy_map').update({
@@ -1554,4 +1584,443 @@ async function handleRotateWeather(supabase: any, userId: string, planetId: stri
   })
 
   return new Response(JSON.stringify({ success: true, rotated: true, weather: weather.id, expiresAt: expiresAt.toISOString() }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// ============================================================
+// PvP handlers
+// ============================================================
+
+// deno-lint-ignore no-explicit-any
+async function handleScanCoordinate(supabase: any, userId: string, planetId: string, targetCoords: string, cors: Record<string, string>) {
+  const { data: planet } = await supabase.from('planets').select('id, player_id').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  if (!targetCoords || !/^\d+:\d+:\d+$/.test(targetCoords)) {
+    return new Response(JSON.stringify({ error: 'Invalid coordinate format (use galaxy:system:position)' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const { data: probeRow } = await supabase.from('planet_ships').select('count').eq('planet_id', planetId).eq('ship_type', 'probe').single()
+  const probeCount = probeRow?.count ?? 0
+  if (probeCount < 1) return new Response(JSON.stringify({ error: 'No probes available' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const { data: existing } = await supabase.from('galaxy_map').select('id, visibility').eq('player_id', userId).eq('coordinates', targetCoords).single()
+  if (existing?.visibility === 'revealed') {
+    return new Response(JSON.stringify({ error: 'Coordinate already revealed' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  await supabase.from('planet_ships').update({ count: probeCount - 1 }).eq('planet_id', planetId).eq('ship_type', 'probe')
+
+  const now = new Date()
+  // deno-lint-ignore no-explicit-any
+  let locationType: string, name: string, metadata: Record<string, any> = {}
+
+  // Priority 1: Check for another player's planet
+  const { data: otherPlanet } = await supabase.from('planets')
+    .select('id, player_id, name, coordinates')
+    .eq('coordinates', targetCoords)
+    .neq('player_id', userId)
+    .limit(1)
+    .single()
+
+  if (otherPlanet) {
+    const { data: owner } = await supabase.from('players').select('username').eq('id', otherPlanet.player_id).single()
+    locationType = 'player_colony'
+    name = otherPlanet.name
+    metadata = { owner_id: otherPlanet.player_id, owner_username: owner?.username ?? 'Unknown', planet_id: otherPlanet.id }
+  } else {
+    // Priority 2: Check for habitable planet
+    const { data: habitablePlanet } = await supabase.from('galaxy_planets')
+      .select('id, name, diameter, max_building_slots, claimed_by')
+      .eq('coordinates', targetCoords)
+      .single()
+
+    if (habitablePlanet && !habitablePlanet.claimed_by) {
+      locationType = 'habitable_planet'
+      name = habitablePlanet.name
+      metadata = { galaxy_planet_id: habitablePlanet.id, diameter: habitablePlanet.diameter, max_building_slots: habitablePlanet.max_building_slots }
+    } else {
+      // Priority 3: Check for own planet
+      const { data: ownPlanet } = await supabase.from('planets')
+        .select('id')
+        .eq('coordinates', targetCoords)
+        .eq('player_id', userId)
+        .single()
+
+      if (ownPlanet) {
+        return new Response(JSON.stringify({ error: 'That is your own planet' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+      }
+
+      // Priority 4: Roll random location
+      locationType = rollLocationType()
+      name = randomLocationName(locationType)
+      if (locationType === 'asteroid_field') metadata.richness = Math.floor(Math.random() * 5) + 1
+      if (locationType === 'bandit_camp') metadata.size = Math.random() < 0.5 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large'
+      if (locationType === 'debris_field') metadata.salvage_metal = Math.floor(Math.random() * 800 + 200)
+    }
+  }
+
+  // Upsert into galaxy_map
+  if (existing) {
+    await supabase.from('galaxy_map').update({
+      visibility: 'revealed',
+      location_type: locationType,
+      name,
+      metadata,
+      revealed_at: now.toISOString(),
+      cleared_at: null,
+      respawns_at: null,
+    }).eq('id', existing.id)
+  } else {
+    await supabase.from('galaxy_map').insert({
+      player_id: userId,
+      coordinates: targetCoords,
+      visibility: 'revealed',
+      location_type: locationType,
+      name,
+      metadata,
+      detected_at: now.toISOString(),
+      revealed_at: now.toISOString(),
+    })
+  }
+
+  await supabase.from('planet_events').insert({
+    planet_id: planetId,
+    event_type: 'scan_result',
+    message: `Scan of ${targetCoords} revealed: ${name}`,
+    metadata: { coordinates: targetCoords, location_type: locationType, name },
+  })
+
+  return new Response(JSON.stringify({ success: true, location_type: locationType, name }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleAttackPlayer(
+  supabase: any, userId: string, planetId: string,
+  targetCoords: string, fleet: Record<string, number>,
+  devMode: boolean, cors: Record<string, string>
+) {
+  const { data: planet } = await supabase.from('planets').select('id, player_id, coordinates').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  // Verify target is a discovered player_colony
+  const { data: mapEntry } = await supabase.from('galaxy_map').select('*').eq('player_id', userId).eq('coordinates', targetCoords).single()
+  if (!mapEntry || mapEntry.location_type !== 'player_colony') {
+    return new Response(JSON.stringify({ error: 'Target is not a discovered player colony' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const meta = mapEntry.metadata as { owner_id: string; planet_id: string; owner_username: string }
+  if (meta.owner_id === userId) {
+    return new Response(JSON.stringify({ error: 'Cannot attack your own planet' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Verify defender planet still exists
+  const { data: defenderPlanet } = await supabase.from('planets')
+    .select('id, player_id')
+    .eq('id', meta.planet_id)
+    .single()
+  if (!defenderPlanet) {
+    return new Response(JSON.stringify({ error: 'Target planet no longer exists' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Validate fleet
+  if (!fleet || Object.values(fleet).every((c) => c <= 0)) {
+    return new Response(JSON.stringify({ error: 'Must send at least one ship' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Validate and deduct ships
+  let slowest = 999
+  for (const [shipType, count] of Object.entries(fleet)) {
+    if (count <= 0) continue
+    const stats = SHIP_STATS[shipType]
+    if (!stats) return new Response(JSON.stringify({ error: `Unknown ship: ${shipType}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+    slowest = Math.min(slowest, stats.speed)
+
+    const { data: shipRow } = await supabase.from('planet_ships').select('count').eq('planet_id', planetId).eq('ship_type', shipType).single()
+    const available = shipRow?.count ?? 0
+    if (available < count) {
+      return new Response(JSON.stringify({ error: `Not enough ${shipType} (have ${available}, need ${count})` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+    }
+    await supabase.from('planet_ships').update({ count: available - count }).eq('planet_id', planetId).eq('ship_type', shipType)
+  }
+
+  // Calculate travel time
+  const distance = coordDistance(planet.coordinates, targetCoords)
+  const travelSeconds = devMode ? 10 : Math.max(60, Math.floor((distance / slowest) * 60))
+  const now = new Date()
+  const arrivesAt = new Date(now.getTime() + travelSeconds * 1000)
+
+  const { data: attack } = await supabase.from('player_attacks').insert({
+    attacker_id: userId,
+    attacker_planet_id: planetId,
+    defender_id: defenderPlanet.player_id,
+    defender_planet_id: defenderPlanet.id,
+    fleet,
+    status: 'in_transit',
+    dispatched_at: now.toISOString(),
+    arrives_at: arrivesAt.toISOString(),
+    target_coordinates: targetCoords,
+  }).select('id').single()
+
+  await supabase.from('planet_events').insert({
+    planet_id: planetId,
+    event_type: 'attack_dispatched',
+    message: `Attack fleet dispatched to ${meta.owner_username}'s colony at ${targetCoords}`,
+    metadata: { attack_id: attack?.id, target_coords: targetCoords, target_owner: meta.owner_username },
+  })
+
+  await supabase.from('planet_events').insert({
+    planet_id: defenderPlanet.id,
+    event_type: 'incoming_attack',
+    message: `Warning: Incoming attack fleet detected! ETA: ${Math.ceil(travelSeconds / 60)} minutes`,
+    metadata: { attack_id: attack?.id, attacker_id: userId },
+  })
+
+  return new Response(JSON.stringify({ success: true, attackId: attack?.id, arrivesAt: arrivesAt.toISOString() }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleResolveAttack(supabase: any, userId: string, attackId: string, cors: Record<string, string>) {
+  const { data: attack } = await supabase.from('player_attacks').select('*').eq('id', attackId).single()
+  if (!attack) return new Response(JSON.stringify({ error: 'Attack not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+  if (attack.status !== 'in_transit') return new Response(JSON.stringify({ error: 'Attack already resolved' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  if (attack.attacker_id !== userId && attack.defender_id !== userId) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const now = new Date()
+  if (new Date(attack.arrives_at) > now) {
+    return new Response(JSON.stringify({ error: 'Attack has not arrived yet' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  // Get defender's stationed fleet
+  const { data: defenderShips } = await supabase.from('planet_ships').select('ship_type, count').eq('planet_id', attack.defender_planet_id)
+  const defenderFleet: Record<string, { count: number; hp: number; attack: number; defense: number }> = {}
+  for (const row of (defenderShips ?? [])) {
+    if (row.count <= 0) continue
+    const stats = SHIP_STATS[row.ship_type]
+    if (!stats) continue
+    defenderFleet[row.ship_type] = { count: row.count, hp: stats.defense * 3, attack: stats.attack, defense: stats.defense }
+  }
+
+  // Run combat
+  const hasDefenders = Object.values(defenderFleet).some((d) => d.count > 0)
+  const attackerFleet = attack.fleet as Record<string, number>
+  let combat
+  if (hasDefenders) {
+    combat = resolveCombat(attackerFleet, defenderFleet)
+  } else {
+    combat = { victory: true, rounds: [], attackerLosses: {}, defenderLosses: {} }
+  }
+
+  // Calculate surviving attacker fleet
+  const survivingAttackerFleet: Record<string, number> = { ...attackerFleet }
+  for (const [t, l] of Object.entries(combat.attackerLosses)) {
+    survivingAttackerFleet[t] = Math.max(0, (survivingAttackerFleet[t] ?? 0) - l)
+  }
+
+  // Update defender's fleet (subtract losses)
+  for (const [t, l] of Object.entries(combat.defenderLosses)) {
+    if (l <= 0) continue
+    const { data: row } = await supabase.from('planet_ships').select('count').eq('planet_id', attack.defender_planet_id).eq('ship_type', t).single()
+    const newCount = Math.max(0, (row?.count ?? 0) - l)
+    await supabase.from('planet_ships').update({ count: newCount }).eq('planet_id', attack.defender_planet_id).eq('ship_type', t)
+  }
+
+  // Calculate stolen resources if attacker won
+  let stolenMetal = 0, stolenGas = 0
+  if (combat.victory) {
+    let totalCargo = 0
+    for (const [type, count] of Object.entries(survivingAttackerFleet)) {
+      if (count <= 0) continue
+      totalCargo += (SHIP_STATS[type]?.cargo ?? 0) * count
+    }
+
+    if (totalCargo > 0) {
+      const { data: defPlanet } = await supabase.from('planets').select('metal_amount, gas_amount').eq('id', attack.defender_planet_id).single()
+      if (defPlanet) {
+        const maxStealMetal = Math.floor(defPlanet.metal_amount * 0.5)
+        const maxStealGas = Math.floor(defPlanet.gas_amount * 0.5)
+        stolenMetal = Math.min(maxStealMetal, Math.floor(totalCargo * 0.6))
+        stolenGas = Math.min(maxStealGas, Math.floor(totalCargo * 0.4))
+
+        await supabase.from('planets').update({
+          metal_amount: defPlanet.metal_amount - stolenMetal,
+          gas_amount: defPlanet.gas_amount - stolenGas,
+        }).eq('id', attack.defender_planet_id)
+      }
+    }
+  }
+
+  // If attacker has survivors, create return trip
+  const totalSurvivors = Object.values(survivingAttackerFleet).reduce((s, c) => s + c, 0)
+  let returnArrivesAt: string | null = null
+  if (combat.victory && totalSurvivors > 0) {
+    const { data: attackerPlanet } = await supabase.from('planets').select('coordinates').eq('id', attack.attacker_planet_id).single()
+    const distance = coordDistance(attack.target_coordinates, attackerPlanet?.coordinates ?? '1:1:1')
+    let slowest = 999
+    for (const [type, count] of Object.entries(survivingAttackerFleet)) {
+      if (count > 0 && SHIP_STATS[type]) slowest = Math.min(slowest, SHIP_STATS[type].speed)
+    }
+    const returnSeconds = Math.max(60, Math.floor((distance / slowest) * 60))
+    returnArrivesAt = new Date(now.getTime() + returnSeconds * 1000).toISOString()
+  }
+
+  const result = {
+    victory: combat.victory,
+    rounds: combat.rounds,
+    attacker_losses: combat.attackerLosses,
+    defender_losses: combat.defenderLosses,
+    stolen: { metal: stolenMetal, gas: stolenGas },
+    surviving_fleet: survivingAttackerFleet,
+  }
+
+  await supabase.from('player_attacks').update({
+    status: combat.victory && totalSurvivors > 0 ? 'returning' : 'resolved',
+    resolved_at: now.toISOString(),
+    return_arrives_at: returnArrivesAt,
+    result,
+  }).eq('id', attackId)
+
+  const attackerMsg = combat.victory
+    ? `Attack on ${attack.target_coordinates} succeeded! Stole ${stolenMetal} metal, ${stolenGas} gas. Fleet returning.`
+    : `Attack on ${attack.target_coordinates} failed. All ships lost.`
+  await supabase.from('planet_events').insert({
+    planet_id: attack.attacker_planet_id,
+    event_type: 'attack_result',
+    message: attackerMsg,
+    metadata: { attack_id: attackId, result },
+  })
+
+  const defenderMsg = combat.victory
+    ? `Your colony was raided! Lost ${stolenMetal} metal, ${stolenGas} gas.`
+    : `Incoming attack repelled! Enemy fleet destroyed.`
+  await supabase.from('planet_events').insert({
+    planet_id: attack.defender_planet_id,
+    event_type: 'attack_result',
+    message: defenderMsg,
+    metadata: { attack_id: attackId, result },
+  })
+
+  return new Response(JSON.stringify({ success: true, result }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleReturnFleet(supabase: any, userId: string, attackId: string, cors: Record<string, string>) {
+  const { data: attack } = await supabase.from('player_attacks').select('*').eq('id', attackId).eq('attacker_id', userId).single()
+  if (!attack) return new Response(JSON.stringify({ error: 'Attack not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+  if (attack.status !== 'returning') return new Response(JSON.stringify({ error: 'Fleet not returning' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const now = new Date()
+  if (new Date(attack.return_arrives_at) > now) {
+    return new Response(JSON.stringify({ error: 'Fleet has not arrived yet' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const result = attack.result as { surviving_fleet: Record<string, number>; stolen: { metal: number; gas: number } }
+
+  // Return ships to planet
+  for (const [type, count] of Object.entries(result.surviving_fleet)) {
+    if (count <= 0) continue
+    const { data: row } = await supabase.from('planet_ships').select('count').eq('planet_id', attack.attacker_planet_id).eq('ship_type', type).single()
+    await supabase.from('planet_ships').update({ count: (row?.count ?? 0) + count }).eq('planet_id', attack.attacker_planet_id).eq('ship_type', type)
+  }
+
+  // Add stolen resources
+  const { data: attackerPlanet } = await supabase.from('planets').select('metal_amount, gas_amount').eq('id', attack.attacker_planet_id).single()
+  if (attackerPlanet) {
+    await supabase.from('planets').update({
+      metal_amount: attackerPlanet.metal_amount + result.stolen.metal,
+      gas_amount: attackerPlanet.gas_amount + result.stolen.gas,
+    }).eq('id', attack.attacker_planet_id)
+  }
+
+  await supabase.from('player_attacks').update({ status: 'resolved' }).eq('id', attackId)
+
+  await supabase.from('planet_events').insert({
+    planet_id: attack.attacker_planet_id,
+    event_type: 'fleet_returned',
+    message: `Raiding fleet returned with ${result.stolen.metal} metal, ${result.stolen.gas} gas`,
+    metadata: { attack_id: attackId },
+  })
+
+  return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleSpawnTestOpponent(supabase: any, userId: string, planetId: string, devMode: boolean, cors: Record<string, string>) {
+  if (!devMode) {
+    return new Response(JSON.stringify({ error: 'Dev mode only' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const { data: planet } = await supabase.from('planets').select('coordinates').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const homeCoord = parseCoord(planet.coordinates)
+
+  const testEmail = `test-opponent-${Date.now()}@starveil-dev.local`
+  const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
+    email: testEmail,
+    password: 'test-opponent-password-12345',
+    email_confirm: true,
+  })
+  if (authErr || !authUser?.user) {
+    return new Response(JSON.stringify({ error: 'Failed to create test user: ' + (authErr?.message ?? 'unknown') }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const opponentId = authUser.user.id
+  const opponentName = `TestOpponent_${Math.floor(Math.random() * 9999)}`
+
+  await supabase.from('players').insert({ id: opponentId, username: opponentName })
+
+  // Place opponent 2-5 systems away
+  const offset = Math.floor(Math.random() * 4) + 2
+  const dir = Math.random() > 0.5 ? 1 : -1
+  const opponentCoords = `${homeCoord.galaxy}:${Math.max(1, homeCoord.system + offset * dir)}:${Math.floor(Math.random() * 15) + 1}`
+
+  const { data: opponentPlanet } = await supabase.from('planets').insert({
+    player_id: opponentId,
+    name: `${opponentName}'s Colony`,
+    coordinates: opponentCoords,
+    diameter: 12400,
+    max_building_slots: 12,
+    metal_amount: 50000,
+    gas_amount: 30000,
+  }).select('id').single()
+
+  if (!opponentPlanet) {
+    return new Response(JSON.stringify({ error: 'Failed to create opponent planet' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  await supabase.from('planet_buildings').insert([
+    { planet_id: opponentPlanet.id, building_id: 'headquarters', level: 3 },
+    { planet_id: opponentPlanet.id, building_id: 'metal_mine', level: 5 },
+    { planet_id: opponentPlanet.id, building_id: 'gas_refinery', level: 4 },
+    { planet_id: opponentPlanet.id, building_id: 'solar_array', level: 5 },
+    { planet_id: opponentPlanet.id, building_id: 'shipyard', level: 4 },
+  ])
+
+  await supabase.from('planet_ships').insert([
+    { planet_id: opponentPlanet.id, ship_type: 'small_fighter', count: 10 },
+    { planet_id: opponentPlanet.id, ship_type: 'large_fighter', count: 3 },
+    { planet_id: opponentPlanet.id, ship_type: 'small_cargo', count: 5 },
+  ])
+
+  await supabase.from('planet_weather').insert({ planet_id: opponentPlanet.id, weather_type: 'calm_skies', expires_at: null })
+
+  // Auto-discover opponent on player's galaxy map
+  await supabase.from('galaxy_map').upsert({
+    player_id: userId,
+    coordinates: opponentCoords,
+    visibility: 'revealed',
+    location_type: 'player_colony',
+    name: `${opponentName}'s Colony`,
+    metadata: { owner_id: opponentId, owner_username: opponentName, planet_id: opponentPlanet.id },
+    detected_at: new Date().toISOString(),
+    revealed_at: new Date().toISOString(),
+  }, { onConflict: 'player_id,coordinates' })
+
+  return new Response(JSON.stringify({
+    success: true,
+    opponent: { id: opponentId, username: opponentName, coordinates: opponentCoords, planetId: opponentPlanet.id },
+  }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }
