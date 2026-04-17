@@ -94,7 +94,7 @@ Deno.serve(async (req: Request) => {
       return await handleAttackPlayer(supabase, user.id, planetId, body.targetCoords, body.fleet, !!devMode, corsHeaders)
     }
     if (action === 'resolve_attack') {
-      return await handleResolveAttack(supabase, user.id, body.attackId, corsHeaders)
+      return await handleResolveAttack(supabase, user.id, body.attackId, !!devMode, corsHeaders)
     }
     if (action === 'return_fleet') {
       return await handleReturnFleet(supabase, user.id, body.attackId, corsHeaders)
@@ -1779,7 +1779,7 @@ async function handleAttackPlayer(
 }
 
 // deno-lint-ignore no-explicit-any
-async function handleResolveAttack(supabase: any, userId: string, attackId: string, cors: Record<string, string>) {
+async function handleResolveAttack(supabase: any, userId: string, attackId: string, devMode: boolean, cors: Record<string, string>) {
   const { data: attack } = await supabase.from('player_attacks').select('*').eq('id', attackId).single()
   if (!attack) return new Response(JSON.stringify({ error: 'Attack not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
   if (attack.status !== 'in_transit') return new Response(JSON.stringify({ error: 'Attack already resolved' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
@@ -1862,9 +1862,13 @@ async function handleResolveAttack(supabase: any, userId: string, attackId: stri
     for (const [type, count] of Object.entries(survivingAttackerFleet)) {
       if (count > 0 && SHIP_STATS[type]) slowest = Math.min(slowest, SHIP_STATS[type].speed)
     }
-    const returnSeconds = Math.max(60, Math.floor((distance / slowest) * 60))
+    const returnSeconds = devMode ? 10 : Math.max(60, Math.floor((distance / slowest) * 60))
     returnArrivesAt = new Date(now.getTime() + returnSeconds * 1000).toISOString()
   }
+
+  // Fetch usernames so battle reports can show opponent names
+  const { data: attackerPlayer } = await supabase.from('players').select('username').eq('id', attack.attacker_id).single()
+  const { data: defenderPlayer } = await supabase.from('players').select('username').eq('id', attack.defender_id).single()
 
   const result = {
     victory: combat.victory,
@@ -1873,6 +1877,8 @@ async function handleResolveAttack(supabase: any, userId: string, attackId: stri
     defender_losses: combat.defenderLosses,
     stolen: { metal: stolenMetal, gas: stolenGas },
     surviving_fleet: survivingAttackerFleet,
+    attacker_username: attackerPlayer?.username ?? 'Unknown',
+    defender_username: defenderPlayer?.username ?? 'Unknown',
   }
 
   await supabase.from('player_attacks').update({
@@ -2021,6 +2027,13 @@ async function handleSpawnTestOpponent(supabase: any, userId: string, planetId: 
 
   return new Response(JSON.stringify({
     success: true,
-    opponent: { id: opponentId, username: opponentName, coordinates: opponentCoords, planetId: opponentPlanet.id },
+    opponent: {
+      id: opponentId,
+      username: opponentName,
+      coordinates: opponentCoords,
+      planetId: opponentPlanet.id,
+      email: testEmail,
+      password: 'test-opponent-password-12345',
+    },
   }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }

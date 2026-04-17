@@ -921,6 +921,14 @@ export function GalaxyMapPage() {
       })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
+      if (data?.opponent?.email) {
+        console.log(
+          `%c[TestOpponent spawned]%c\nUsername: ${data.opponent.username}\nEmail: ${data.opponent.email}\nPassword: ${data.opponent.password}\nCoords: ${data.opponent.coordinates}\n\nSign out and log in with these credentials to verify the defender's experience.`,
+          'color: #c084fc; font-weight: bold',
+          'color: inherit'
+        )
+        alert(`TestOpponent spawned!\n\nTo view as defender:\n1. Sign out\n2. Log in with:\nEmail: ${data.opponent.email}\nPassword: ${data.opponent.password}`)
+      }
       await refetch()
     } catch (err) {
       console.error('Failed to spawn opponent:', err)

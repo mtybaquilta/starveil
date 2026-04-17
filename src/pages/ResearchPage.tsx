@@ -15,7 +15,7 @@ const BRANCH_LABELS: Record<TechBranch, string> = {
 
 const BRANCHES: TechBranch[] = ['military', 'economy', 'exploration', 'energy']
 
-const BRANCH_ICONS: Record<TechBranch, JSX.Element> = {
+const BRANCH_ICONS: Record<TechBranch, React.JSX.Element> = {
   military: (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
       <path d="M12 2l3 7h7l-5.5 4.5 2 7L12 16l-6.5 4.5 2-7L2 9h7z" />

@@ -21,6 +21,7 @@ export function Layout() {
     missions, completedMissions, galaxyMap, technologies, researchQueue,
     weather, events, achievements,
     outgoingAttacks: outgoingAttacksRaw, incomingAttacks: incomingAttacksRaw,
+    resolvedAttacks,
     loading, refetch,
   } = usePlanet(selectedPlanetId)
   const resources = useResources(planet, buildings, weather, technologies)
@@ -145,6 +146,7 @@ export function Layout() {
               achievements,
               outgoingAttacks,
               incomingAttacks,
+              resolvedAttacks,
               dispatchAttack,
               planets,
               selectPlanet,
@@ -182,6 +184,7 @@ export type GameContext = {
   achievements: ReturnType<typeof usePlanet>['achievements']
   outgoingAttacks: ReturnType<typeof usePlanet>['outgoingAttacks']
   incomingAttacks: ReturnType<typeof usePlanet>['incomingAttacks']
+  resolvedAttacks: ReturnType<typeof usePlanet>['resolvedAttacks']
   dispatchAttack: ReturnType<typeof useAttacks>['dispatchAttack']
   planets: ReturnType<typeof usePlanets>['planets']
   selectPlanet: ReturnType<typeof usePlanets>['selectPlanet']

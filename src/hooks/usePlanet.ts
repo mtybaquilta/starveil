@@ -113,6 +113,8 @@ export type PlayerAttack = {
     surviving_fleet?: Record<string, number>
     attacker_losses?: Record<string, number>
     defender_losses?: Record<string, number>
+    attacker_username?: string
+    defender_username?: string
   } | null
   target_coordinates: string
 }
@@ -144,6 +146,7 @@ export function usePlanet(selectedPlanetId: string | null) {
   const [achievements, setAchievements] = useState<PlayerAchievement[]>([])
   const [outgoingAttacks, setOutgoingAttacks] = useState<PlayerAttack[]>([])
   const [incomingAttacks, setIncomingAttacks] = useState<PlayerAttack[]>([])
+  const [resolvedAttacks, setResolvedAttacks] = useState<PlayerAttack[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -151,7 +154,6 @@ export function usePlanet(selectedPlanetId: string | null) {
     if (!selectedPlanetId) return
 
     try {
-      setLoading(true)
       const { data: sessionData } = await supabase.auth.getSession()
       const playerId = sessionData.session?.user.id
 
@@ -159,6 +161,7 @@ export function usePlanet(selectedPlanetId: string | null) {
         .from('planets')
         .select('*')
         .eq('id', selectedPlanetId)
+        .eq('player_id', playerId)
         .single()
 
       if (planetErr) throw planetErr
@@ -170,7 +173,7 @@ export function usePlanet(selectedPlanetId: string | null) {
         buildingsRes, queueRes, weatherRes, eventsRes,
         shipsRes, shipQueueRes, missionsRes, completedMissionsRes,
         galaxyRes, techRes, researchRes, achievementsRes,
-        outgoingAttacksRes, incomingAttacksRes,
+        outgoingAttacksRes, incomingAttacksRes, resolvedAttacksRes,
       ] = await Promise.all([
         supabase
           .from('planet_buildings')
@@ -243,6 +246,13 @@ export function usePlanet(selectedPlanetId: string | null) {
           .eq('defender_id', playerId)
           .neq('status', 'resolved')
           .order('dispatched_at', { ascending: false }),
+        supabase
+          .from('player_attacks')
+          .select('*')
+          .or(`attacker_id.eq.${playerId},defender_id.eq.${playerId}`)
+          .eq('status', 'resolved')
+          .order('resolved_at', { ascending: false })
+          .limit(50),
       ])
 
       if (buildingsRes.data) setBuildings(buildingsRes.data)
@@ -257,8 +267,9 @@ export function usePlanet(selectedPlanetId: string | null) {
       if (techRes.data) setTechnologies(techRes.data)
       if (researchRes.data) setResearchQueue(researchRes.data)
       if (achievementsRes.data) setAchievements(achievementsRes.data)
-      if (outgoingAttacksRes.data) setOutgoingAttacks(outgoingAttacksRes.data)
-      if (incomingAttacksRes.data) setIncomingAttacks(incomingAttacksRes.data)
+      setOutgoingAttacks(outgoingAttacksRes.data ?? [])
+      setIncomingAttacks(incomingAttacksRes.data ?? [])
+      setResolvedAttacks(resolvedAttacksRes.data ?? [])
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -286,6 +297,7 @@ export function usePlanet(selectedPlanetId: string | null) {
     achievements,
     outgoingAttacks,
     incomingAttacks,
+    resolvedAttacks,
     loading,
     error,
     refetch: fetchAll,

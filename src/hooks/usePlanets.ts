@@ -23,9 +23,14 @@ export function usePlanets() {
   const [loading, setLoading] = useState(true)
 
   const fetchPlanets = useCallback(async () => {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const playerId = sessionData.session?.user.id
+    if (!playerId) { setLoading(false); return }
+
     const { data } = await supabase
       .from('planets')
       .select('id, name, coordinates')
+      .eq('player_id', playerId)
       .order('created_at', { ascending: true })
 
     if (data && data.length > 0) {

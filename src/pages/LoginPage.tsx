@@ -21,7 +21,7 @@ export function LoginPage() {
 
     try {
       if (isSignUp) {
-        // await signUp(email, password, username)
+        await signUp(email, password, username)
       } else {
         await signIn(email, password)
       }
@@ -97,12 +97,12 @@ export function LoginPage() {
           </button>
         </form>
 
-        {/* <button
+        <button
           onClick={() => { setIsSignUp(!isSignUp); setError('') }}
           className="w-full text-center text-sm text-slate-500 hover:text-slate-300 mt-4 transition-colors"
         >
           {isSignUp ? 'Already have a colony? Sign in' : 'New commander? Create a colony'}
-        </button> */}
+        </button>
       </div>
     </div>
   )

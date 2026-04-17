@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { IS_DEV_MODE } from '../lib/devMode'
 import type { PlayerAttack } from './usePlanet'
 
 export function useAttacks(
@@ -9,25 +10,28 @@ export function useAttacks(
   onComplete: () => void
 ) {
   const resolvingRef = useRef<Set<string>>(new Set())
-
-  const resolveAttack = useCallback(async (attackId: string, action: string) => {
-    if (!planetId || resolvingRef.current.has(attackId)) return
-    resolvingRef.current.add(attackId)
-    try {
-      await supabase.functions.invoke('game-action', {
-        body: { action, planetId, attackId },
-      })
-      onComplete()
-    } catch (err) {
-      console.error(`Failed to ${action}:`, err)
-    } finally {
-      resolvingRef.current.delete(attackId)
-    }
-  }, [planetId, onComplete])
+  const onCompleteRef = useRef(onComplete)
+  onCompleteRef.current = onComplete
+  const planetIdRef = useRef(planetId)
+  planetIdRef.current = planetId
 
   useEffect(() => {
     const allAttacks = [...outgoingAttacks, ...incomingAttacks]
     if (allAttacks.length === 0) return
+
+    const resolveAttack = async (attackId: string, action: string) => {
+      if (!planetIdRef.current || resolvingRef.current.has(attackId)) return
+      resolvingRef.current.add(attackId)
+      try {
+        await supabase.functions.invoke('game-action', {
+          body: { action, planetId: planetIdRef.current, attackId, devMode: IS_DEV_MODE },
+        })
+        onCompleteRef.current()
+      } catch (err) {
+        console.error(`Failed to ${action}:`, err)
+        resolvingRef.current.delete(attackId)
+      }
+    }
 
     const interval = setInterval(() => {
       const now = Date.now()
@@ -41,20 +45,20 @@ export function useAttacks(
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [outgoingAttacks, incomingAttacks, resolveAttack])
+  }, [outgoingAttacks, incomingAttacks])
 
   const dispatchAttack = useCallback(
     async (fleet: Record<string, number>, targetCoords: string, devMode: boolean) => {
-      if (!planetId) return
+      if (!planetIdRef.current) return
       const { data, error } = await supabase.functions.invoke('game-action', {
-        body: { action: 'attack_player', planetId, fleet, targetCoords, devMode },
+        body: { action: 'attack_player', planetId: planetIdRef.current, fleet, targetCoords, devMode },
       })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
-      onComplete()
+      onCompleteRef.current()
       return data
     },
-    [planetId, onComplete]
+    []
   )
 
   return { outgoingAttacks, incomingAttacks, dispatchAttack }
