@@ -1827,7 +1827,17 @@ async function handleResolveAttack(supabase: any, userId: string, attackId: stri
     await supabase.from('planet_ships').update({ count: newCount }).eq('planet_id', attack.defender_planet_id).eq('ship_type', t)
   }
 
-  // Calculate stolen resources if attacker won
+  // Calculate salvage from destroyed defender ships (25% of build cost)
+  let salvageMetal = 0, salvageGas = 0
+  for (const [type, count] of Object.entries(combat.defenderLosses)) {
+    if (count <= 0) continue
+    const cost = SHIPS[type]?.cost
+    if (!cost) continue
+    salvageMetal += Math.floor(count * cost.metal * 0.25)
+    salvageGas += Math.floor(count * cost.gas * 0.25)
+  }
+
+  // Calculate stolen resources and apply cargo cap to pooled rewards
   let stolenMetal = 0, stolenGas = 0
   if (combat.victory) {
     let totalCargo = 0
@@ -1836,20 +1846,41 @@ async function handleResolveAttack(supabase: any, userId: string, attackId: stri
       totalCargo += (SHIP_STATS[type]?.cargo ?? 0) * count
     }
 
-    if (totalCargo > 0) {
-      const { data: defPlanet } = await supabase.from('planets').select('metal_amount, gas_amount').eq('id', attack.defender_planet_id).single()
-      if (defPlanet) {
-        const maxStealMetal = Math.floor(defPlanet.metal_amount * 0.5)
-        const maxStealGas = Math.floor(defPlanet.gas_amount * 0.5)
-        stolenMetal = Math.min(maxStealMetal, Math.floor(totalCargo * 0.6))
-        stolenGas = Math.min(maxStealGas, Math.floor(totalCargo * 0.4))
+    const metalCap = Math.floor(totalCargo * 0.6)
+    const gasCap = Math.floor(totalCargo * 0.4)
 
+    const { data: defPlanet } = await supabase.from('planets').select('metal_amount, gas_amount').eq('id', attack.defender_planet_id).single()
+    if (defPlanet) {
+      const maxStealMetal = Math.floor(defPlanet.metal_amount * 0.5)
+      const maxStealGas = Math.floor(defPlanet.gas_amount * 0.5)
+
+      // Pool salvage + stockpile, cap by cargo
+      const totalMetal = Math.min(salvageMetal + maxStealMetal, metalCap)
+      const totalGas = Math.min(salvageGas + maxStealGas, gasCap)
+
+      // Salvage fills cargo first; remainder comes from stockpile
+      const actualSalvageMetal = Math.min(salvageMetal, totalMetal)
+      const actualSalvageGas = Math.min(salvageGas, totalGas)
+      stolenMetal = totalMetal - actualSalvageMetal
+      stolenGas = totalGas - actualSalvageGas
+      salvageMetal = actualSalvageMetal
+      salvageGas = actualSalvageGas
+
+      if (stolenMetal > 0 || stolenGas > 0) {
         await supabase.from('planets').update({
           metal_amount: defPlanet.metal_amount - stolenMetal,
           gas_amount: defPlanet.gas_amount - stolenGas,
         }).eq('id', attack.defender_planet_id)
       }
+    } else {
+      // No defender planet data — salvage still capped by cargo
+      salvageMetal = Math.min(salvageMetal, metalCap)
+      salvageGas = Math.min(salvageGas, gasCap)
     }
+  } else {
+    // Attacker lost — no salvage (all ships destroyed, no survivors to carry wreckage)
+    salvageMetal = 0
+    salvageGas = 0
   }
 
   // If attacker has survivors, create return trip
@@ -1876,6 +1907,7 @@ async function handleResolveAttack(supabase: any, userId: string, attackId: stri
     attacker_losses: combat.attackerLosses,
     defender_losses: combat.defenderLosses,
     stolen: { metal: stolenMetal, gas: stolenGas },
+    salvage: { metal: salvageMetal, gas: salvageGas },
     surviving_fleet: survivingAttackerFleet,
     attacker_username: attackerPlayer?.username ?? 'Unknown',
     defender_username: defenderPlayer?.username ?? 'Unknown',
@@ -1889,7 +1921,7 @@ async function handleResolveAttack(supabase: any, userId: string, attackId: stri
   }).eq('id', attackId)
 
   const attackerMsg = combat.victory
-    ? `Attack on ${attack.target_coordinates} succeeded! Stole ${stolenMetal} metal, ${stolenGas} gas. Fleet returning.`
+    ? `Attack on ${attack.target_coordinates} succeeded! Looted ${stolenMetal} metal, ${stolenGas} gas. Salvaged ${salvageMetal} metal, ${salvageGas} gas from destroyed ships. Fleet returning.`
     : `Attack on ${attack.target_coordinates} failed. All ships lost.`
   await supabase.from('planet_events').insert({
     planet_id: attack.attacker_planet_id,
@@ -1899,7 +1931,7 @@ async function handleResolveAttack(supabase: any, userId: string, attackId: stri
   })
 
   const defenderMsg = combat.victory
-    ? `Your colony was raided! Lost ${stolenMetal} metal, ${stolenGas} gas.`
+    ? `Your colony was raided! Lost ${stolenMetal} metal, ${stolenGas} gas. Enemy salvaged ships from the battle.`
     : `Incoming attack repelled! Enemy fleet destroyed.`
   await supabase.from('planet_events').insert({
     planet_id: attack.defender_planet_id,
