@@ -1954,7 +1954,7 @@ async function handleReturnFleet(supabase: any, userId: string, attackId: string
     return new Response(JSON.stringify({ error: 'Fleet has not arrived yet' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
   }
 
-  const result = attack.result as { surviving_fleet: Record<string, number>; stolen: { metal: number; gas: number } }
+  const result = attack.result as { surviving_fleet: Record<string, number>; stolen: { metal: number; gas: number }; salvage: { metal: number; gas: number } }
 
   // Return ships to planet
   for (const [type, count] of Object.entries(result.surviving_fleet)) {
@@ -1966,18 +1966,22 @@ async function handleReturnFleet(supabase: any, userId: string, attackId: string
   // Add stolen resources
   const { data: attackerPlanet } = await supabase.from('planets').select('metal_amount, gas_amount').eq('id', attack.attacker_planet_id).single()
   if (attackerPlanet) {
+    const totalMetal = result.stolen.metal + (result.salvage?.metal ?? 0)
+    const totalGas = result.stolen.gas + (result.salvage?.gas ?? 0)
     await supabase.from('planets').update({
-      metal_amount: attackerPlanet.metal_amount + result.stolen.metal,
-      gas_amount: attackerPlanet.gas_amount + result.stolen.gas,
+      metal_amount: attackerPlanet.metal_amount + totalMetal,
+      gas_amount: attackerPlanet.gas_amount + totalGas,
     }).eq('id', attack.attacker_planet_id)
   }
 
   await supabase.from('player_attacks').update({ status: 'resolved' }).eq('id', attackId)
 
+  const returnMetal = result.stolen.metal + (result.salvage?.metal ?? 0)
+  const returnGas = result.stolen.gas + (result.salvage?.gas ?? 0)
   await supabase.from('planet_events').insert({
     planet_id: attack.attacker_planet_id,
     event_type: 'fleet_returned',
-    message: `Raiding fleet returned with ${result.stolen.metal} metal, ${result.stolen.gas} gas`,
+    message: `Raiding fleet returned with ${returnMetal} metal, ${returnGas} gas (${result.stolen.metal} looted, ${result.salvage?.metal ?? 0} salvaged)`,
     metadata: { attack_id: attackId },
   })
 
