@@ -1999,11 +1999,11 @@ async function handleSpawnTestOpponent(supabase: any, userId: string, planetId: 
 
   const homeCoord = parseCoord(planet.coordinates)
 
-  const testEmail = `test-opponent-${Date.now()}@starveil-dev.local`
+  const testEmail = `test@starveil.local`
   const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
     email: testEmail,
-    password: 'test-opponent-password-12345',
-    email_confirm: true,
+    password: '12345',
+    email_confirm: false,
   })
   if (authErr || !authUser?.user) {
     return new Response(JSON.stringify({ error: 'Failed to create test user: ' + (authErr?.message ?? 'unknown') }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } })

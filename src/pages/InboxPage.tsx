@@ -126,6 +126,8 @@ function AttackReport({
   const myLosses = iAmAttacker ? result.attacker_losses : result.defender_losses
   const opponentLosses = iAmAttacker ? result.defender_losses : result.attacker_losses
   const stolen = result.stolen ?? { metal: 0, gas: 0 }
+  const salvage = result.salvage ?? { metal: 0, gas: 0 }
+  const totalLoot = { metal: stolen.metal + salvage.metal, gas: stolen.gas + salvage.gas }
 
   const resolvedAt = attack.resolved_at ?? attack.dispatched_at
 
@@ -145,9 +147,9 @@ function AttackReport({
             <span className="text-xs text-slate-400">{arrow} {opponent ?? 'Unknown'} ({attack.target_coordinates})</span>
           </div>
           <div className="flex items-center gap-3">
-            {iAmAttacker && iWon && (
+            {iAmAttacker && iWon && (totalLoot.metal > 0 || totalLoot.gas > 0) && (
               <span className="text-[10px] text-slate-500">
-                +{stolen.metal ?? 0} metal · +{stolen.gas ?? 0} gas
+                +{totalLoot.metal.toLocaleString()} metal · +{totalLoot.gas.toLocaleString()} gas
               </span>
             )}
             {!iAmAttacker && result.victory && (
@@ -176,6 +178,16 @@ function AttackReport({
                 <span className={iAmAttacker ? 'text-blue-400' : 'text-red-400'}>
                   {iAmAttacker ? '+' : '−'}{(stolen.gas ?? 0).toLocaleString()} gas
                 </span>
+              </div>
+            </div>
+          )}
+
+          {iAmAttacker && result.victory && (salvage.metal > 0 || salvage.gas > 0) && (
+            <div className="space-y-1">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Salvage</div>
+              <div className="flex gap-4 text-xs">
+                <span className="text-amber-400">+{salvage.metal.toLocaleString()} metal</span>
+                <span className="text-blue-400">+{salvage.gas.toLocaleString()} gas</span>
               </div>
             </div>
           )}
