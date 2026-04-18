@@ -782,7 +782,10 @@ async function handleCompleteShipBuild(supabase: any, userId: string, planetId: 
     const shipyardLevel = shipyardBuilding?.level ?? 0
     const nextConfig = SHIPS[next.ship_type]
     const buildTime = nextConfig ? shipBuildTimeSeconds(nextConfig.baseBuildTimeSeconds, shipyardLevel) * next.quantity : 60
-    const startedAt = new Date()
+    // Use the previous item's completion time as the start, not wall-clock now.
+    // This lets elapsed items cascade to completion on the next client poll.
+    const prevCompletedAt = completedBuilds[completedBuilds.length - 1].completes_at
+    const startedAt = new Date(prevCompletedAt)
     const completesAt = new Date(startedAt.getTime() + buildTime * 1000)
     await supabase.from('ship_queue').update({ started_at: startedAt.toISOString(), completes_at: completesAt.toISOString() }).eq('id', next.id)
   }
