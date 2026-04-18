@@ -548,7 +548,7 @@ function MissionDot({
 
   return (
     <div
-      className="absolute z-[8] pointer-events-none transition-all duration-[5000ms] ease-linear"
+      className="absolute z-[8] pointer-events-none transition-[left,top] duration-1000 ease-linear"
       style={{ left: x, top: y, transform: 'translate(-50%, -50%)' }}
     >
       {/* Outer pulse ring */}
@@ -605,7 +605,7 @@ function AttackDot({
 
   return (
     <div
-      className="absolute z-[8] pointer-events-none transition-all duration-[5000ms] ease-linear"
+      className="absolute z-[8] pointer-events-none transition-[left,top] duration-1000 ease-linear"
       style={{ left: x, top: y, transform: 'translate(-50%, -50%)' }}
     >
       <div
@@ -733,10 +733,10 @@ export function GalaxyMapPage() {
     setCamY(HOME_Y - wh / 2)
   }, [])
 
-  // Tick every 5s to update mission dot positions
+  // Tick every 1s to update fleet/mission dot positions
   const [, setTick] = useState(0)
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 5000)
+    const id = setInterval(() => setTick((t) => t + 1), 1000)
     return () => clearInterval(id)
   }, [])
 
