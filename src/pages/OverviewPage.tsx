@@ -6,6 +6,7 @@ import { BuildingCard } from '../components/BuildingCard'
 import { EventTimeline } from '../components/EventTimeline'
 import { WeatherDisplay } from '../components/WeatherDisplay'
 import { BUILDINGS, getBuildingConfig } from '../config/buildings'
+import { DEFENSES } from '../config/defenses'
 import type { GameContext } from '../components/Layout'
 
 function isBuildingUnlocked(
@@ -27,7 +28,7 @@ function isBuildingUnlocked(
 }
 
 export function OverviewPage() {
-  const { planet, buildings, weather, events, refetch } = useOutletContext<GameContext>()
+  const { planet, buildings, weather, events, defenseFleet, refetch } = useOutletContext<GameContext>()
   const [editing, setEditing] = useState(false)
   const [nameInput, setNameInput] = useState(planet.name)
   const [renameError, setRenameError] = useState<string | null>(null)
@@ -96,9 +97,10 @@ export function OverviewPage() {
         <p className="text-xs text-slate-500 mt-0.5">
           Temperate · Diameter: {planet.diameter.toLocaleString()} km · Slots: {usedSlots}/{planet.max_building_slots} used
           {(() => {
-            const defenseRating = BUILDINGS
-              .filter((b) => b.defenseRating)
-              .reduce((sum, b) => sum + (b.defenseRating! * (buildingLevels.get(b.id) ?? 0)), 0)
+            const defenseRating = defenseFleet.reduce((sum, d) => {
+              const cfg = DEFENSES.find((def) => def.id === d.defense_type)
+              return sum + (cfg ? (cfg.attack + cfg.defense) * d.count : 0)
+            }, 0)
             return defenseRating > 0 ? <span className="ml-2 text-emerald-400">· Defense: {defenseRating}</span> : null
           })()}
         </p>

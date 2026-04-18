@@ -214,6 +214,31 @@ const SHIP_STATS: Record<string, { speed: number; cargo: number; attack: number;
   colony_ship:   { speed: 3,  cargo: 0,     attack: 0,   defense: 50,  miningYield: 0  },
 }
 
+const DEFENSES: Record<string, {
+  cost: { metal: number; gas: number }
+  baseBuildTimeSeconds: number
+  prerequisites: Array<
+    | { kind: 'building'; buildingId: string; level: number }
+    | { kind: 'defense'; defenseType: string; count: number }
+  >
+}> = {
+  perimeter_turret: { cost: { metal: 150, gas: 50  }, baseBuildTimeSeconds: 45,  prerequisites: [{ kind: 'building', buildingId: 'headquarters', level: 2 }] },
+  sensor_jammer:    { cost: { metal: 200, gas: 200 }, baseBuildTimeSeconds: 75,  prerequisites: [{ kind: 'building', buildingId: 'headquarters', level: 4 }] },
+  missile_battery:  { cost: { metal: 250, gas: 150 }, baseBuildTimeSeconds: 90,  prerequisites: [{ kind: 'building', buildingId: 'headquarters', level: 3 }, { kind: 'defense', defenseType: 'perimeter_turret', count: 3 }] },
+  ion_cannon:       { cost: { metal: 400, gas: 250 }, baseBuildTimeSeconds: 120, prerequisites: [{ kind: 'building', buildingId: 'headquarters', level: 4 }, { kind: 'building', buildingId: 'research_lab', level: 2 }] },
+  shield_generator: { cost: { metal: 500, gas: 350 }, baseBuildTimeSeconds: 150, prerequisites: [{ kind: 'building', buildingId: 'headquarters', level: 5 }, { kind: 'building', buildingId: 'research_lab', level: 3 }] },
+  orbital_platform: { cost: { metal: 800, gas: 500 }, baseBuildTimeSeconds: 200, prerequisites: [{ kind: 'building', buildingId: 'headquarters', level: 7 }, { kind: 'defense', defenseType: 'ion_cannon', count: 5 }] },
+}
+
+const DEFENSE_STATS: Record<string, { attack: number; defense: number }> = {
+  perimeter_turret: { attack: 20,  defense: 15  },
+  sensor_jammer:    { attack: 15,  defense: 25  },
+  missile_battery:  { attack: 55,  defense: 35  },
+  ion_cannon:       { attack: 90,  defense: 50  },
+  shield_generator: { attack: 0,   defense: 120 },
+  orbital_platform: { attack: 180, defense: 100 },
+}
+
 const MISSION_CONFIGS: Record<string, { requiredShips: string[]; minDurationSeconds: number }> = {
   mining:  { requiredShips: ['harvester'],     minDurationSeconds: 120 },
   raid:    { requiredShips: ['small_fighter'], minDurationSeconds: 90  },
@@ -468,8 +493,6 @@ function resolveCombat(
 // Achievement helpers
 // ============================================================
 
-const DEFENSE_BUILDING_IDS = ['perimeter_turret', 'ion_cannon', 'missile_battery', 'shield_generator', 'sensor_jammer', 'orbital_platform']
-
 const TECH_BRANCHES: Record<string, string[]> = {
   military:    ['reinforced_hulls', 'advanced_weapons', 'capital_ship_engineering'],
   economy:     ['efficient_refining', 'deep_core_mining', 'expanded_storage', 'rapid_extraction'],
@@ -495,8 +518,11 @@ async function checkBuildAchievements(supabase: any, userId: string, planetId: s
   if (buildings.some((b: any) => b.level >= 10)) unlocked.push('megalopolis')
   // power_grid: solar_array Lv.5
   if ((bMap.get('solar_array') ?? 0) >= 5) unlocked.push('power_grid')
-  // fortified: all defense structures built (level >= 1)
-  if (DEFENSE_BUILDING_IDS.every(id => (bMap.get(id) ?? 0) >= 1)) unlocked.push('fortified')
+  // fortified: all defense types with count >= 1
+  const { data: defenses } = await supabase.from('planet_defenses').select('defense_type, count').eq('planet_id', planetId)
+  // deno-lint-ignore no-explicit-any
+  const dMap = new Map((defenses ?? []).map((d: any) => [d.defense_type, d.count]))
+  if (Object.keys(DEFENSES).every(id => (dMap.get(id) ?? 0) >= 1)) unlocked.push('fortified')
   // industrialist: metal_mine + gas_refinery both Lv.5+
   if ((bMap.get('metal_mine') ?? 0) >= 5 && (bMap.get('gas_refinery') ?? 0) >= 5) unlocked.push('industrialist')
 
@@ -702,8 +728,13 @@ async function handleStartShipBuild(supabase: any, userId: string, planetId: str
   const { data: planet } = await supabase.from('planets').select('id, player_id').eq('id', planetId).eq('player_id', userId).single()
   if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-  const shipConfig = SHIPS[shipType]
-  if (!shipConfig) return new Response(JSON.stringify({ error: 'Unknown ship type' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  const isDefense = shipType in DEFENSES
+  const shipConfig = isDefense ? null : SHIPS[shipType]
+  const defenseConfig = isDefense ? DEFENSES[shipType] : null
+
+  if (!shipConfig && !defenseConfig) {
+    return new Response(JSON.stringify({ error: 'Unknown ship or defense type' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
 
   // Check queue cap (max 5 items)
   const { data: allQueueItems } = await supabase.from('ship_queue').select('id, completes_at').eq('planet_id', planetId)
@@ -712,23 +743,41 @@ async function handleStartShipBuild(supabase: any, userId: string, planetId: str
 
   const { data: shipyardBuilding } = await supabase.from('planet_buildings').select('level').eq('planet_id', planetId).eq('building_id', 'shipyard').single()
   const shipyardLevel = shipyardBuilding?.level ?? 0
-  if (shipyardLevel < shipConfig.requiredShipyardLevel) {
-    return new Response(JSON.stringify({ error: `Requires Shipyard level ${shipConfig.requiredShipyardLevel}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
-  }
 
-  // Check tech requirements for capital ships
-  if (shipConfig.requiredTech) {
-    const { data: techRow } = await supabase.from('player_technologies').select('level').eq('player_id', userId).eq('tech_id', shipConfig.requiredTech.techId).single()
-    const techLevel = techRow?.level ?? 0
-    if (techLevel < shipConfig.requiredTech.level) {
-      return new Response(JSON.stringify({ error: `Requires ${shipConfig.requiredTech.techId} level ${shipConfig.requiredTech.level}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  if (shipConfig) {
+    if (shipyardLevel < shipConfig.requiredShipyardLevel) {
+      return new Response(JSON.stringify({ error: `Requires Shipyard level ${shipConfig.requiredShipyardLevel}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+    }
+    if (shipConfig.requiredTech) {
+      const { data: techRow } = await supabase.from('player_technologies').select('level').eq('player_id', userId).eq('tech_id', shipConfig.requiredTech.techId).single()
+      const techLevel = techRow?.level ?? 0
+      if (techLevel < shipConfig.requiredTech.level) {
+        return new Response(JSON.stringify({ error: `Requires ${shipConfig.requiredTech.techId} level ${shipConfig.requiredTech.level}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+      }
     }
   }
 
+  if (defenseConfig) {
+    for (const prereq of defenseConfig.prerequisites) {
+      if (prereq.kind === 'building') {
+        const { data: bldg } = await supabase.from('planet_buildings').select('level').eq('planet_id', planetId).eq('building_id', prereq.buildingId).single()
+        if ((bldg?.level ?? 0) < prereq.level) {
+          return new Response(JSON.stringify({ error: `Requires ${prereq.buildingId} level ${prereq.level}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+        }
+      } else {
+        const { data: def } = await supabase.from('planet_defenses').select('count').eq('planet_id', planetId).eq('defense_type', prereq.defenseType).single()
+        if ((def?.count ?? 0) < prereq.count) {
+          return new Response(JSON.stringify({ error: `Requires ${prereq.count} ${prereq.defenseType}` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+        }
+      }
+    }
+  }
+
+  const config = shipConfig ?? defenseConfig!
   if (devMode) await topUpDevResources(supabase, planetId)
   const resources = await recalculateResources(supabase, planetId)
-  const metalCost = shipConfig.cost.metal * quantity
-  const gasCost = shipConfig.cost.gas * quantity
+  const metalCost = config.cost.metal * quantity
+  const gasCost = config.cost.gas * quantity
   if (resources.metal < metalCost || resources.gas < gasCost) {
     return new Response(JSON.stringify({ error: 'Insufficient resources', required: { metal: metalCost, gas: gasCost }, available: resources }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
   }
@@ -738,14 +787,12 @@ async function handleStartShipBuild(supabase: any, userId: string, planetId: str
   const now = new Date()
 
   if (isBuilding) {
-    // Queue the item — no completes_at until the active build finishes
     await supabase.from('ship_queue').insert({ planet_id: planetId, ship_type: shipType, quantity, started_at: now.toISOString(), completes_at: null })
     await supabase.from('planet_events').insert({ planet_id: planetId, event_type: 'ship_build_started', message: `Queued ${quantity} ${shipType}`, metadata: { ship_type: shipType, quantity } })
     return new Response(JSON.stringify({ success: true, queued: true }), { headers: { ...cors, 'Content-Type': 'application/json' } })
   }
 
-  // Start building immediately
-  const buildTime = devMode ? 10 : shipBuildTimeSeconds(shipConfig.baseBuildTimeSeconds, shipyardLevel) * quantity
+  const buildTime = devMode ? 10 : shipBuildTimeSeconds(config.baseBuildTimeSeconds, shipyardLevel) * quantity
   const completesAt = new Date(now.getTime() + buildTime * 1000)
 
   await supabase.from('ship_queue').insert({ planet_id: planetId, ship_type: shipType, quantity, started_at: now.toISOString(), completes_at: completesAt.toISOString() })
@@ -766,9 +813,16 @@ async function handleCompleteShipBuild(supabase: any, userId: string, planetId: 
   const completed = []
   // deno-lint-ignore no-explicit-any
   for (const build of completedBuilds as any[]) {
-    const { data: existing } = await supabase.from('planet_ships').select('count').eq('planet_id', planetId).eq('ship_type', build.ship_type).single()
-    const currentCount = existing?.count ?? 0
-    await supabase.from('planet_ships').upsert({ planet_id: planetId, ship_type: build.ship_type, count: currentCount + build.quantity, updated_at: now.toISOString() }, { onConflict: 'planet_id,ship_type' })
+    const isDefense = build.ship_type in DEFENSES
+    if (isDefense) {
+      const { data: existing } = await supabase.from('planet_defenses').select('count').eq('planet_id', planetId).eq('defense_type', build.ship_type).single()
+      const currentCount = existing?.count ?? 0
+      await supabase.from('planet_defenses').upsert({ planet_id: planetId, defense_type: build.ship_type, count: currentCount + build.quantity, updated_at: now.toISOString() }, { onConflict: 'planet_id,defense_type' })
+    } else {
+      const { data: existing } = await supabase.from('planet_ships').select('count').eq('planet_id', planetId).eq('ship_type', build.ship_type).single()
+      const currentCount = existing?.count ?? 0
+      await supabase.from('planet_ships').upsert({ planet_id: planetId, ship_type: build.ship_type, count: currentCount + build.quantity, updated_at: now.toISOString() }, { onConflict: 'planet_id,ship_type' })
+    }
     await supabase.from('ship_queue').delete().eq('id', build.id)
     await supabase.from('planet_events').insert({ planet_id: planetId, event_type: 'ship_build_completed', message: `${build.quantity} ${build.ship_type} completed`, metadata: { ship_type: build.ship_type, quantity: build.quantity } })
     completed.push({ shipType: build.ship_type, quantity: build.quantity })
@@ -780,7 +834,7 @@ async function handleCompleteShipBuild(supabase: any, userId: string, planetId: 
     const next = nextQueued[0]
     const { data: shipyardBuilding } = await supabase.from('planet_buildings').select('level').eq('planet_id', planetId).eq('building_id', 'shipyard').single()
     const shipyardLevel = shipyardBuilding?.level ?? 0
-    const nextConfig = SHIPS[next.ship_type]
+    const nextConfig = SHIPS[next.ship_type] ?? DEFENSES[next.ship_type]
     const buildTime = nextConfig ? shipBuildTimeSeconds(nextConfig.baseBuildTimeSeconds, shipyardLevel) * next.quantity : 60
     // Use the previous item's completion time as the start, not wall-clock now.
     // This lets elapsed items cascade to completion on the next client poll.
@@ -1796,14 +1850,21 @@ async function handleResolveAttack(supabase: any, userId: string, attackId: stri
     return new Response(JSON.stringify({ error: 'Attack has not arrived yet' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
   }
 
-  // Get defender's stationed fleet
+  // Get defender's stationed fleet and defenses
   const { data: defenderShips } = await supabase.from('planet_ships').select('ship_type, count').eq('planet_id', attack.defender_planet_id)
+  const { data: defenderDefenses } = await supabase.from('planet_defenses').select('defense_type, count').eq('planet_id', attack.defender_planet_id)
   const defenderFleet: Record<string, { count: number; hp: number; attack: number; defense: number }> = {}
   for (const row of (defenderShips ?? [])) {
     if (row.count <= 0) continue
     const stats = SHIP_STATS[row.ship_type]
     if (!stats) continue
     defenderFleet[row.ship_type] = { count: row.count, hp: stats.defense * 3, attack: stats.attack, defense: stats.defense }
+  }
+  for (const row of (defenderDefenses ?? [])) {
+    if (row.count <= 0) continue
+    const stats = DEFENSE_STATS[row.defense_type]
+    if (!stats) continue
+    defenderFleet[row.defense_type] = { count: row.count, hp: stats.defense * 3, attack: stats.attack, defense: stats.defense }
   }
 
   // Run combat
@@ -1822,12 +1883,18 @@ async function handleResolveAttack(supabase: any, userId: string, attackId: stri
     survivingAttackerFleet[t] = Math.max(0, (survivingAttackerFleet[t] ?? 0) - l)
   }
 
-  // Update defender's fleet (subtract losses)
+  // Update defender's fleet and defenses (subtract losses)
   for (const [t, l] of Object.entries(combat.defenderLosses)) {
     if (l <= 0) continue
-    const { data: row } = await supabase.from('planet_ships').select('count').eq('planet_id', attack.defender_planet_id).eq('ship_type', t).single()
-    const newCount = Math.max(0, (row?.count ?? 0) - l)
-    await supabase.from('planet_ships').update({ count: newCount }).eq('planet_id', attack.defender_planet_id).eq('ship_type', t)
+    if (t in DEFENSES) {
+      const { data: row } = await supabase.from('planet_defenses').select('count').eq('planet_id', attack.defender_planet_id).eq('defense_type', t).single()
+      const newCount = Math.max(0, (row?.count ?? 0) - l)
+      await supabase.from('planet_defenses').update({ count: newCount }).eq('planet_id', attack.defender_planet_id).eq('defense_type', t)
+    } else {
+      const { data: row } = await supabase.from('planet_ships').select('count').eq('planet_id', attack.defender_planet_id).eq('ship_type', t).single()
+      const newCount = Math.max(0, (row?.count ?? 0) - l)
+      await supabase.from('planet_ships').update({ count: newCount }).eq('planet_id', attack.defender_planet_id).eq('ship_type', t)
+    }
   }
 
   // Calculate salvage from destroyed defender ships (25% of build cost)
