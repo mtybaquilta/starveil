@@ -213,9 +213,9 @@ function DefenseCard({
         <button
           onClick={handleBuild}
           disabled={disabled}
-          className="w-full py-2 text-[11px] font-semibold rounded-lg bg-emerald-600/80 text-white disabled:opacity-40 hover:bg-emerald-600 transition-colors"
+          className="w-full py-2.5 bg-sky-500 hover:bg-sky-400 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
         >
-          {building ? 'Queuing…' : queueFull ? 'Queue Full' : !canAfford ? 'Insufficient Resources' : 'Build 1'}
+          {building ? 'Building...' : queueFull ? 'Queue Full (5)' : !canAfford ? 'Insufficient Resources' : 'Build →'}
         </button>
       </div>
     </div>
