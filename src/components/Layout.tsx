@@ -17,7 +17,7 @@ import { useAttacks } from '../hooks/useAttacks'
 export function Layout() {
   const { planets, selectedPlanetId, selectPlanet, refetchPlanets } = usePlanets()
   const {
-    planet, buildings, constructionQueue, shipFleet, shipQueue,
+    planet, buildings, constructionQueue, shipFleet, defenseFleet, shipQueue,
     missions, completedMissions, galaxyMap, technologies, researchQueue,
     weather, events, achievements,
     outgoingAttacks: outgoingAttacksRaw, incomingAttacks: incomingAttacksRaw,
@@ -134,6 +134,7 @@ export function Layout() {
               shipBuildQueue,
               startShipBuild,
               shipFleet,
+              defenseFleet,
               missions,
               completedMissions,
               activeMissions,
@@ -172,6 +173,7 @@ export type GameContext = {
   shipBuildQueue: ReturnType<typeof useShipQueue>['shipQueue']
   startShipBuild: ReturnType<typeof useShipQueue>['startShipBuild']
   shipFleet: ReturnType<typeof usePlanet>['shipFleet']
+  defenseFleet: ReturnType<typeof usePlanet>['defenseFleet']
   missions: ReturnType<typeof usePlanet>['missions']
   completedMissions: ReturnType<typeof usePlanet>['completedMissions']
   activeMissions: ReturnType<typeof useMissions>['activeMissions']

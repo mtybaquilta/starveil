@@ -19,6 +19,11 @@ export type PlanetShip = {
   count: number
 }
 
+export type PlanetDefense = {
+  defense_type: string
+  count: number
+}
+
 export type ShipQueueItem = {
   id: string
   ship_type: string
@@ -135,6 +140,7 @@ export function usePlanet(selectedPlanetId: string | null) {
   const [buildings, setBuildings] = useState<PlanetBuilding[]>([])
   const [constructionQueue, setConstructionQueue] = useState<ConstructionItem[]>([])
   const [shipFleet, setShipFleet] = useState<PlanetShip[]>([])
+  const [defenseFleet, setDefenseFleet] = useState<PlanetDefense[]>([])
   const [shipQueue, setShipQueue] = useState<ShipQueueItem[]>([])
   const [missions, setMissions] = useState<Mission[]>([])
   const [completedMissions, setCompletedMissions] = useState<Mission[]>([])
@@ -171,7 +177,7 @@ export function usePlanet(selectedPlanetId: string | null) {
 
       const [
         buildingsRes, queueRes, weatherRes, eventsRes,
-        shipsRes, shipQueueRes, missionsRes, completedMissionsRes,
+        shipsRes, defenseFleetRes, shipQueueRes, missionsRes, completedMissionsRes,
         galaxyRes, techRes, researchRes, achievementsRes,
         outgoingAttacksRes, incomingAttacksRes, resolvedAttacksRes,
       ] = await Promise.all([
@@ -199,6 +205,10 @@ export function usePlanet(selectedPlanetId: string | null) {
         supabase
           .from('planet_ships')
           .select('ship_type, count')
+          .eq('planet_id', planetId),
+        supabase
+          .from('planet_defenses')
+          .select('defense_type, count')
           .eq('planet_id', planetId),
         supabase
           .from('ship_queue')
@@ -260,6 +270,7 @@ export function usePlanet(selectedPlanetId: string | null) {
       if (weatherRes.data) setWeather(weatherRes.data)
       if (eventsRes.data) setEvents(eventsRes.data)
       if (shipsRes.data) setShipFleet(shipsRes.data)
+      if (defenseFleetRes.data) setDefenseFleet(defenseFleetRes.data)
       if (shipQueueRes.data) setShipQueue(shipQueueRes.data)
       if (missionsRes.data) setMissions(missionsRes.data)
       if (completedMissionsRes.data) setCompletedMissions(completedMissionsRes.data)
@@ -286,6 +297,7 @@ export function usePlanet(selectedPlanetId: string | null) {
     buildings,
     constructionQueue,
     shipFleet,
+    defenseFleet,
     shipQueue,
     missions,
     completedMissions,
