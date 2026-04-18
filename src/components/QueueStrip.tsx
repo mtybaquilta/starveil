@@ -1,5 +1,6 @@
 import { getBuildingConfig } from '../config/buildings'
 import { getShipConfig } from '../config/ships'
+import { DEFENSE_IDS, getDefenseConfig } from '../config/defenses'
 import { getTechConfig } from '../config/technologies'
 import { formatTime } from '../hooks/useConstructionQueue'
 import type { ConstructionItem, ShipQueueItem, ResearchQueueItem } from '../hooks/usePlanet'
@@ -22,7 +23,11 @@ export function QueueStrip({
   if (!hasAnything) return null
 
   const buildingConfig = activeBuild ? getBuildingConfig(activeBuild.building_id) : null
-  const shipConfig = activeShipBuild ? getShipConfig(activeShipBuild.ship_type) : null
+  const shipConfig = activeShipBuild
+    ? DEFENSE_IDS.has(activeShipBuild.ship_type)
+      ? getDefenseConfig(activeShipBuild.ship_type)
+      : getShipConfig(activeShipBuild.ship_type)
+    : null
   const techConfig = activeResearch ? (() => { try { return getTechConfig(activeResearch.tech_id) } catch { return null } })() : null
 
   return (
