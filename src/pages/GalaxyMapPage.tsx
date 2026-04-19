@@ -955,6 +955,23 @@ export function GalaxyMapPage() {
     }
   }
 
+  const handleSpawnBoss = async () => {
+    setSending(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('game-action', {
+        body: { action: 'spawn_world_boss', planetId: planet.id, devMode: true },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      console.log(`%c[World boss spawned]%c ${data.name} at ${data.coordinates}`, 'color: #e879f9; font-weight: bold', 'color: inherit')
+      await refetch()
+    } catch (err) {
+      console.error('Failed to spawn world boss:', err)
+    } finally {
+      setSending(false)
+    }
+  }
+
   const handleSpawnOpponent = async () => {
     setSending(true)
     try {
@@ -1047,6 +1064,15 @@ export function GalaxyMapPage() {
               className="px-3 py-1.5 text-[10px] font-medium rounded bg-purple-600/20 border border-purple-500/30 text-purple-400 hover:bg-purple-600/30 disabled:opacity-40 transition-colors"
             >
               Spawn Opponent
+            </button>
+          )}
+          {IS_DEV_MODE && (
+            <button
+              onClick={handleSpawnBoss}
+              disabled={sending}
+              className="px-3 py-1.5 text-[10px] font-medium rounded bg-fuchsia-600/20 border border-fuchsia-500/30 text-fuchsia-400 hover:bg-fuchsia-600/30 disabled:opacity-40 transition-colors"
+            >
+              Spawn World Boss
             </button>
           )}
         </div>

@@ -102,6 +102,9 @@ Deno.serve(async (req: Request) => {
     if (action === 'spawn_test_opponent') {
       return await handleSpawnTestOpponent(supabase, user.id, planetId, !!devMode, corsHeaders)
     }
+    if (action === 'spawn_world_boss') {
+      return await handleSpawnWorldBoss(supabase, user.id, planetId, !!devMode, body.bossId, corsHeaders)
+    }
 
     return new Response(JSON.stringify({ error: 'Unknown action' }), {
       status: 400,
@@ -2161,6 +2164,83 @@ async function handleReturnFleet(supabase: any, userId: string, attackId: string
   })
 
   return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+// deno-lint-ignore no-explicit-any
+async function handleSpawnWorldBoss(supabase: any, userId: string, planetId: string, devMode: boolean, bossId: string | undefined, cors: Record<string, string>) {
+  if (!devMode) {
+    return new Response(JSON.stringify({ error: 'Dev mode only' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const { data: planet } = await supabase.from('planets').select('coordinates').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const chosenBossId = bossId && BOSS_FLEETS[bossId] ? bossId : rollBossId()
+  const boss = BOSS_FLEETS[chosenBossId]
+
+  const home = parseCoord(planet.coordinates)
+  // Try up to 20 random nearby coords not already used
+  let targetCoords: string | null = null
+  for (let i = 0; i < 20; i++) {
+    const dx = Math.floor(Math.random() * 9) - 4
+    const dy = Math.floor(Math.random() * 9) - 4
+    if (dx === 0 && dy === 0) continue
+    const coord = `${home.galaxy}:${Math.max(1, home.system + dx)}:${Math.max(1, home.position + dy)}`
+    const { data: existing } = await supabase.from('galaxy_map')
+      .select('id, location_type')
+      .eq('player_id', userId)
+      .eq('coordinates', coord)
+      .maybeSingle()
+    if (!existing || !existing.location_type) {
+      targetCoords = coord
+      break
+    }
+  }
+  if (!targetCoords) {
+    return new Response(JSON.stringify({ error: 'No free coordinate nearby' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const now = new Date().toISOString()
+  const metadata = { boss_id: chosenBossId, tier: boss.tier }
+  const name = boss.name
+
+  const { data: existing } = await supabase.from('galaxy_map')
+    .select('id')
+    .eq('player_id', userId)
+    .eq('coordinates', targetCoords)
+    .maybeSingle()
+
+  if (existing) {
+    await supabase.from('galaxy_map').update({
+      visibility: 'revealed',
+      location_type: 'world_boss',
+      name,
+      metadata,
+      revealed_at: now,
+      cleared_at: null,
+      respawns_at: null,
+    }).eq('id', existing.id)
+  } else {
+    await supabase.from('galaxy_map').insert({
+      player_id: userId,
+      coordinates: targetCoords,
+      visibility: 'revealed',
+      location_type: 'world_boss',
+      name,
+      metadata,
+      revealed_at: now,
+    })
+  }
+
+  await supabase.from('planet_events').insert({
+    planet_id: planetId,
+    event_type: 'system',
+    message: `[DEV] Spawned ${name} at ${targetCoords}`,
+    metadata: { boss_id: chosenBossId, coordinates: targetCoords },
+  })
+
+  return new Response(JSON.stringify({ success: true, boss_id: chosenBossId, name, coordinates: targetCoords }), { headers: { ...cors, 'Content-Type': 'application/json' } })
 }
 
 // deno-lint-ignore no-explicit-any
