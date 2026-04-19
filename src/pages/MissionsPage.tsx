@@ -218,9 +218,36 @@ export function MissionsPage() {
               {(() => {
                 const target = targetOptions.find((t) => t.coordinates === targetCoords)
                 if (!target || target.location_type !== 'world_boss') return null
-                const bossId = (target.metadata as Record<string, unknown>)?.boss_id as string | undefined
+                const mm = (target.metadata ?? {}) as Record<string, unknown>
+                const bossId = mm.boss_id as string | undefined
                 if (!bossId || !BOSS_IDS.has(bossId)) return null
                 const boss = getBossConfig(bossId)
+                const phase = mm.phase as string | undefined
+                const eventId = mm.event_id as string | undefined
+
+                if (eventId && phase === 'heralded') {
+                  return (
+                    <div className="rounded-lg border border-fuchsia-500/40 bg-fuchsia-900/30 px-3 py-2 text-[11px] text-fuchsia-200">
+                      ⚠ {boss.name} has not yet arrived. Raids will be available once the herald window ends.
+                    </div>
+                  )
+                }
+                if (eventId && phase === 'active') {
+                  const expiresAt = mm.expires_at as string | undefined
+                  const remainingSec = expiresAt
+                    ? Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
+                    : 0
+                  const h = Math.floor(remainingSec / 3600)
+                  const m = Math.floor((remainingSec % 3600) / 60)
+                  return (
+                    <div className="rounded-lg border border-fuchsia-500/50 bg-fuchsia-900/40 px-3 py-2 text-[11px] text-fuchsia-100 space-y-1">
+                      <div className="font-semibold">⚔ {boss.name} — Cooperative Encounter</div>
+                      <div>HP: {(mm.hp_remaining as number)} / {(mm.hp_max as number)}</div>
+                      <div>Window closes in: {h}h {m}m</div>
+                      <div className="text-fuchsia-300/80">Rewards split proportionally by damage dealt; killing blow earns +10%.</div>
+                    </div>
+                  )
+                }
                 return (
                   <div className="rounded-lg border border-fuchsia-500/30 bg-fuchsia-950/20 px-3 py-2">
                     <div className="text-[11px] font-semibold text-fuchsia-300">⚠ {boss.name} ({boss.tier})</div>
