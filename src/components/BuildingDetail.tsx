@@ -135,14 +135,6 @@ export function BuildingDetail({ buildingId, buildings, metal, gas, activeBuild,
             {config.category === 'storage' && level > 0 && (
               <StatBlock label="Capacity" value={Math.floor(storageCapacity(BASE_STORAGE, level)).toLocaleString()} color="text-slate-300" />
             )}
-            {config.defenseRating && level > 0 && (
-              <>
-                <StatBlock label="Defense Rating" value={`${config.defenseRating * level}`} color="text-emerald-400" />
-                {!isMaxLevel && (
-                  <StatBlock label="Next Level" value={`${config.defenseRating * targetLevel}`} color="text-green-400" />
-                )}
-              </>
-            )}
             {config.baseEnergyConsumption > 0 && (
               <StatBlock
                 label="Energy Use"
