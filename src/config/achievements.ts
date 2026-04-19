@@ -16,6 +16,7 @@ export type AchievementCondition =
   | { type: 'first_action'; action: string }
   | { type: 'resource_accumulated'; resource: 'metal' | 'gas'; amount: number }
   | { type: 'building_pair_level'; buildings: { buildingId: string; level: number }[] }
+  | { type: 'boss_killed'; bossId: string }
 
 export type AchievementConfig = {
   id: string
@@ -124,6 +125,27 @@ export const ACHIEVEMENTS: AchievementConfig[] = [
     description: 'Amass a fleet of 100 ships.',
     category: 'combat',
     condition: { type: 'ship_count', count: 100 },
+  },
+  {
+    id: 'boss_slayer_minor',
+    name: 'Boss Slayer: Minor',
+    description: 'Defeat the Derelict Dreadnought.',
+    category: 'combat',
+    condition: { type: 'boss_killed', bossId: 'derelict_dreadnought' },
+  },
+  {
+    id: 'boss_slayer_elite',
+    name: 'Boss Slayer: Elite',
+    description: 'Defeat the Pirate Flagship.',
+    category: 'combat',
+    condition: { type: 'boss_killed', bossId: 'pirate_flagship' },
+  },
+  {
+    id: 'boss_slayer_apex',
+    name: 'Boss Slayer: Apex',
+    description: 'Defeat the Void Leviathan.',
+    category: 'combat',
+    condition: { type: 'boss_killed', bossId: 'void_leviathan' },
   },
 
   // --- Exploration ---

@@ -3,13 +3,14 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useOutletContext } from 'react-router-dom'
 import { MISSION_TYPES, getMissionConfig } from '../config/missions'
 import { SHIPS } from '../config/ships'
+import { getBossConfig, BOSS_IDS } from '../config/bosses'
 import { formatTime } from '../hooks/useConstructionQueue'
 import type { GameContext } from '../components/Layout'
 import type { Mission, GalaxyMapEntry } from '../hooks/usePlanet'
 
 const MISSION_TYPE_TARGETS: Record<string, string[]> = {
   mining:  ['asteroid_field'],
-  raid:    ['bandit_camp'],
+  raid:    ['bandit_camp', 'world_boss'],
   salvage: ['debris_field', 'asteroid_field', 'bandit_camp', 'empty'],
 }
 
@@ -212,6 +213,22 @@ export function MissionsPage() {
                   })}
                 </div>
               </div>
+
+              {/* Boss warning */}
+              {(() => {
+                const target = targetOptions.find((t) => t.coordinates === targetCoords)
+                if (!target || target.location_type !== 'world_boss') return null
+                const bossId = (target.metadata as Record<string, unknown>)?.boss_id as string | undefined
+                if (!bossId || !BOSS_IDS.has(bossId)) return null
+                const boss = getBossConfig(bossId)
+                return (
+                  <div className="rounded-lg border border-fuchsia-500/30 bg-fuchsia-950/20 px-3 py-2">
+                    <div className="text-[11px] font-semibold text-fuchsia-300">⚠ {boss.name} ({boss.tier})</div>
+                    <div className="text-[10px] text-fuchsia-200/70 mt-0.5">{boss.description}</div>
+                    <div className="text-[10px] text-fuchsia-400/80 mt-1">Recommended fleet power: {boss.recommendedFleetPower.toLocaleString()}</div>
+                  </div>
+                )
+              })()}
 
               {/* Fleet Summary */}
               {totalFleetShips > 0 && <FleetSummary fleet={fleet} />}
