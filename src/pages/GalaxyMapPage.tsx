@@ -346,6 +346,10 @@ function DetailPanel({
             ? `A ${(meta?.size as string) ?? 'unknown'} bandit encampment. Raid it for resources, but expect armed resistance.`
             : type === 'debris_field'
               ? 'Wreckage from a past battle. Deploy cargo ships to salvage valuable materials.'
+            : type === 'world_boss' && (meta as Record<string, unknown>)?.phase === 'heralded'
+              ? `${(entry.name ?? 'Apex threat')} is approaching. Combat unavailable until arrival.`
+            : type === 'world_boss' && (meta as Record<string, unknown>)?.phase === 'active'
+              ? `${(entry.name ?? 'Apex threat')} — HP ${(meta as Record<string, unknown>)?.hp_remaining as number}/${(meta as Record<string, unknown>)?.hp_max as number}. Coordinate with other commanders!`
             : type === 'world_boss'
               ? `A high-threat hostile (${(meta?.tier as string) ?? 'unknown'} tier). Raid with a capable fleet to claim rare loot.`
               : ''
@@ -371,6 +375,33 @@ function DetailPanel({
             </span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">{description}</p>
+          {type === 'world_boss' && (meta as Record<string, unknown>)?.phase === 'active' && (() => {
+            const mm = meta as Record<string, unknown>
+            const hp = (mm.hp_remaining as number) ?? 0
+            const hpMax = (mm.hp_max as number) ?? 1
+            const contribs = (mm.damage_contributors as Record<string, number>) ?? {}
+            return (
+              <div className="mt-3 space-y-2">
+                <div className="h-2 rounded bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full bg-fuchsia-500"
+                    style={{ width: `${Math.max(0, Math.min(100, (hp / hpMax) * 100))}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-white/60">
+                  Top contributors:
+                  <ul className="mt-1 space-y-0.5">
+                    {Object.entries(contribs)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 5)
+                      .map(([pid, dmg]) => (
+                        <li key={pid} className="text-fuchsia-300/80">{pid.slice(0, 8)}… — {dmg} dmg</li>
+                      ))}
+                  </ul>
+                </div>
+              </div>
+            )
+          })()}
           <div className="flex gap-5 mt-2.5">
             {!isDetected && type === 'habitable_planet' && (
               <>
@@ -972,6 +1003,23 @@ export function GalaxyMapPage() {
     }
   }
 
+  const handleHeraldApex = async () => {
+    setSending(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('game-action', {
+        body: { action: 'herald_apex_boss', planetId: planet.id, devMode: true, bossId: 'void_leviathan' },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      console.log(`%c[Apex heralded]%c event ${data.event_id} at ${data.coordinates}`, 'color:#d946ef;font-weight:bold', 'color:inherit')
+      await refetch()
+    } catch (err) {
+      console.error('Failed to herald apex:', err)
+    } finally {
+      setSending(false)
+    }
+  }
+
   const handleSpawnOpponent = async () => {
     setSending(true)
     try {
@@ -1073,6 +1121,15 @@ export function GalaxyMapPage() {
               className="px-3 py-1.5 text-[10px] font-medium rounded bg-fuchsia-600/20 border border-fuchsia-500/30 text-fuchsia-400 hover:bg-fuchsia-600/30 disabled:opacity-40 transition-colors"
             >
               Spawn World Boss
+            </button>
+          )}
+          {IS_DEV_MODE && (
+            <button
+              onClick={handleHeraldApex}
+              disabled={sending}
+              className="px-3 py-1.5 text-[10px] font-medium rounded bg-purple-600/20 border border-purple-500/30 text-purple-400 hover:bg-purple-600/30 disabled:opacity-40 transition-colors"
+            >
+              Herald Apex Boss
             </button>
           )}
         </div>
