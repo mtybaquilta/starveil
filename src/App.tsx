@@ -12,6 +12,7 @@ import { GalaxyMapPage } from './pages/GalaxyMapPage'
 import { ResearchPage } from './pages/ResearchPage'
 import { InboxPage } from './pages/InboxPage'
 import { AchievementsPage } from './pages/AchievementsPage'
+import { LeaderboardPage } from './pages/LeaderboardPage'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -50,6 +51,7 @@ function App() {
           <Route path="missions" element={<MissionsPage />} />
           <Route path="research" element={<ResearchPage />} />
           <Route path="achievements" element={<AchievementsPage />} />
+          <Route path="leaderboard" element={<LeaderboardPage />} />
           <Route path="inbox" element={<InboxPage />} />
         </Route>
       </Routes>

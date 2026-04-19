@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { to: '/missions', label: 'Missions' },
   { to: '/research', label: 'Research' },
   { to: '/achievements', label: 'Achievements' },
+  { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/inbox', label: 'Inbox' },
 ]
 

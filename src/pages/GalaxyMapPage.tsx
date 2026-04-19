@@ -97,6 +97,23 @@ function PlayerColonyTile() {
   )
 }
 
+function WorldBossTile({ tier }: { tier?: string }) {
+  const glow = tier === 'apex'
+    ? '0 0 18px rgba(217,70,239,0.6)'
+    : tier === 'elite'
+    ? '0 0 14px rgba(239,68,68,0.5)'
+    : '0 0 10px rgba(251,146,60,0.45)'
+  const color = tier === 'apex' ? '#d946ef' : tier === 'elite' ? '#ef4444' : '#fb923c'
+  return (
+    <div
+      className="w-[30px] h-[30px] rounded-full flex items-center justify-center"
+      style={{ background: `radial-gradient(circle at 35% 35%, ${color}, #1f1025 80%)`, boxShadow: glow }}
+    >
+      <span className="text-[14px] font-bold text-white/90 leading-none">☠</span>
+    </div>
+  )
+}
+
 function LocationNode({
   entry,
   homeCoords,
@@ -124,6 +141,8 @@ function LocationNode({
           ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-red-500/20 bg-gradient-to-br from-red-900/25 to-red-950/30'
           : type === 'debris_field'
             ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-slate-400/12 bg-gradient-to-br from-slate-600/30 to-slate-800/45'
+          : type === 'world_boss'
+            ? 'w-[52px] h-[52px] rounded-full border-[1.5px] border-fuchsia-500/40 bg-gradient-to-br from-fuchsia-950/40 to-slate-950/60'
             : 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-slate-700/20 bg-slate-800/30'
 
   const labelColor = isDetected
@@ -133,6 +152,7 @@ function LocationNode({
     : type === 'asteroid_field' ? 'text-amber-400'
     : type === 'bandit_camp' ? 'text-red-400'
     : type === 'debris_field' ? 'text-slate-400'
+    : type === 'world_boss' ? 'text-fuchsia-400'
     : 'text-slate-500'
 
   return (
@@ -155,6 +175,7 @@ function LocationNode({
         {!isDetected && type === 'asteroid_field' && <AsteroidTile />}
         {!isDetected && type === 'bandit_camp' && <BanditTile />}
         {!isDetected && type === 'debris_field' && <DebrisTile />}
+        {!isDetected && type === 'world_boss' && <WorldBossTile tier={(entry.metadata as Record<string, unknown>)?.tier as string | undefined} />}
       </div>
       <div className={`text-[8px] font-semibold text-center max-w-[70px] leading-tight ${labelColor}`}>
         {isDetected ? entry.coordinates : entry.name ?? entry.location_type?.replace(/_/g, ' ') ?? entry.coordinates}
@@ -214,6 +235,7 @@ function Minimap({
       case 'asteroid_field': return 'bg-amber-400'
       case 'bandit_camp': return 'bg-red-500'
       case 'debris_field': return 'bg-slate-500'
+      case 'world_boss': return 'bg-fuchsia-500'
       default: return 'bg-slate-600'
     }
   }
@@ -291,6 +313,7 @@ function DetailPanel({
     : type === 'asteroid_field' ? 'Asteroid Field'
     : type === 'bandit_camp' ? 'Bandit Camp'
     : type === 'debris_field' ? 'Debris Field'
+    : type === 'world_boss' ? 'World Boss'
     : 'Unknown'
 
   const titleColor = isDetected ? 'text-yellow-500/80'
@@ -299,6 +322,7 @@ function DetailPanel({
     : type === 'asteroid_field' ? 'text-amber-400'
     : type === 'bandit_camp' ? 'text-red-400'
     : type === 'debris_field' ? 'text-slate-300'
+    : type === 'world_boss' ? 'text-fuchsia-400'
     : 'text-slate-400'
 
   const badgeBg = isDetected ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-600'
@@ -307,6 +331,7 @@ function DetailPanel({
     : type === 'asteroid_field' ? 'bg-amber-500/10 border-amber-500/20 text-amber-600'
     : type === 'bandit_camp' ? 'bg-red-500/10 border-red-500/20 text-red-600'
     : type === 'debris_field' ? 'bg-slate-400/10 border-slate-400/15 text-slate-500'
+    : type === 'world_boss' ? 'bg-fuchsia-500/10 border-fuchsia-500/25 text-fuchsia-500'
     : 'bg-slate-600/10 border-slate-600/20 text-slate-500'
 
   const description = isDetected
@@ -321,6 +346,8 @@ function DetailPanel({
             ? `A ${(meta?.size as string) ?? 'unknown'} bandit encampment. Raid it for resources, but expect armed resistance.`
             : type === 'debris_field'
               ? 'Wreckage from a past battle. Deploy cargo ships to salvage valuable materials.'
+            : type === 'world_boss'
+              ? `A high-threat hostile (${(meta?.tier as string) ?? 'unknown'} tier). Raid with a capable fleet to claim rare loot.`
               : ''
 
   const size = (meta?.size as string) ?? 'medium'
@@ -387,6 +414,12 @@ function DetailPanel({
                 <div className="text-[13px] font-semibold text-slate-300">~{(meta?.salvage_metal as number) ?? '?'} metal</div>
               </div>
             )}
+            {!isDetected && type === 'world_boss' && (
+              <div>
+                <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Tier</div>
+                <div className="text-[13px] font-semibold text-fuchsia-400 capitalize">{(meta?.tier as string) ?? '?'}</div>
+              </div>
+            )}
             <div>
               <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Coordinates</div>
               <div className="text-[12px] font-medium text-slate-300 font-mono">{entry.coordinates}</div>
@@ -447,6 +480,15 @@ function DetailPanel({
               style={{ background: 'linear-gradient(135deg, #dc2626, #991b1b)', boxShadow: '0 2px 8px rgba(220,38,38,0.25)' }}
             >
               Send Raid Fleet
+            </button>
+          )}
+          {!isDetected && type === 'world_boss' && (
+            <button
+              onClick={() => onNavigateMission(entry.coordinates, 'raid')}
+              className="w-full py-2 text-[11px] font-semibold rounded-lg text-white transition-colors"
+              style={{ background: 'linear-gradient(135deg, #a21caf, #6b21a8)', boxShadow: '0 2px 8px rgba(162,28,175,0.3)' }}
+            >
+              Engage Boss
             </button>
           )}
           {!isDetected && type === 'debris_field' && (

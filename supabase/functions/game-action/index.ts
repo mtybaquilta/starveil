@@ -271,8 +271,9 @@ const TECH_CONFIGS: Record<string, {
 // Galaxy map location types and their spawn weights
 const LOCATION_TYPES = [
   { type: 'asteroid_field', weight: 40, richness: () => Math.floor(Math.random() * 5) + 1 },
-  { type: 'bandit_camp',    weight: 30, size: () => Math.random() < 0.5 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large' },
-  { type: 'debris_field',   weight: 20, metal: () => Math.floor(Math.random() * 500 + 100) },
+  { type: 'bandit_camp',    weight: 28, size: () => Math.random() < 0.5 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large' },
+  { type: 'debris_field',   weight: 18, metal: () => Math.floor(Math.random() * 500 + 100) },
+  { type: 'world_boss',     weight: 4 },
   { type: 'empty',          weight: 10 },
 ]
 const TOTAL_LOCATION_WEIGHT = LOCATION_TYPES.reduce((s, t) => s + t.weight, 0)
@@ -281,6 +282,7 @@ const LOCATION_NAMES: Record<string, string[]> = {
   asteroid_field: ['Alpha Belt', 'Beta Cluster', 'Gamma Ridge', 'Delta Shoal', 'Epsilon Field', 'Zeta Expanse'],
   bandit_camp:    ['Bandit Outpost', 'Raider Base', 'Pirate Stronghold', 'Marauder Den', 'Outlaw Station'],
   debris_field:   ['Wreckage Field', 'Battle Debris', 'Scattered Ruins', 'Lost Fleet', 'Derelict Zone'],
+  world_boss:     ['Anomalous Signal', 'Threat Contact', 'Unknown Menace', 'Crimson Beacon'],
   empty:          ['Empty Sector', 'Void Passage', 'Silent Drift', 'Dark Expanse'],
 }
 
@@ -288,6 +290,55 @@ const BANDIT_FLEETS: Record<string, { name: string; ships: Record<string, { coun
   small:  { name: 'Small Bandit Patrol',  ships: { raider: { count: 3, hp: 20, attack: 8,  defense: 4  } } },
   medium: { name: 'Bandit Squadron',      ships: { raider: { count: 5, hp: 20, attack: 8,  defense: 4  }, gunship: { count: 2, hp: 50, attack: 20, defense: 12 } } },
   large:  { name: 'Bandit Armada',        ships: { raider: { count: 8, hp: 20, attack: 8,  defense: 4  }, gunship: { count: 4, hp: 50, attack: 20, defense: 12 }, destroyer: { count: 1, hp: 120, attack: 45, defense: 30 } } },
+}
+
+type BossTier = 'minor' | 'elite' | 'apex'
+const BOSS_FLEETS: Record<string, { name: string; tier: BossTier; ships: Record<string, { count: number; hp: number; attack: number; defense: number }> }> = {
+  derelict_dreadnought: {
+    name: 'Derelict Dreadnought',
+    tier: 'minor',
+    ships: {
+      heavy_turret:  { count: 4, hp: 400, attack: 80,  defense: 60 },
+      relic_gunship: { count: 2, hp: 600, attack: 120, defense: 80 },
+    },
+  },
+  pirate_flagship: {
+    name: 'Pirate Flagship',
+    tier: 'elite',
+    ships: {
+      flagship:       { count: 1, hp: 4000, attack: 300, defense: 250 },
+      raider_gunship: { count: 6, hp: 700,  attack: 140, defense: 90  },
+      interceptor:    { count: 4, hp: 350,  attack: 90,  defense: 50  },
+    },
+  },
+  void_leviathan: {
+    name: 'Void Leviathan',
+    tier: 'apex',
+    ships: {
+      leviathan:   { count: 1,  hp: 12000, attack: 600, defense: 500 },
+      void_drone:  { count: 10, hp: 400,   attack: 100, defense: 60  },
+      bile_cannon: { count: 4,  hp: 900,   attack: 220, defense: 140 },
+    },
+  },
+}
+const BOSS_LOOT: Record<string, { metal: [number, number]; gas: [number, number]; respawnHours: [number, number] }> = {
+  derelict_dreadnought: { metal: [5000, 12000],  gas: [3000, 8000],   respawnHours: [8, 12]  },
+  pirate_flagship:      { metal: [15000, 30000], gas: [10000, 20000], respawnHours: [12, 18] },
+  void_leviathan:       { metal: [40000, 80000], gas: [25000, 50000], respawnHours: [18, 24] },
+}
+const BOSS_TIER_WEIGHTS: { id: string; weight: number }[] = [
+  { id: 'derelict_dreadnought', weight: 60 },
+  { id: 'pirate_flagship',      weight: 30 },
+  { id: 'void_leviathan',       weight: 10 },
+]
+function rollBossId(): string {
+  const total = BOSS_TIER_WEIGHTS.reduce((s, b) => s + b.weight, 0)
+  let roll = Math.random() * total
+  for (const b of BOSS_TIER_WEIGHTS) { roll -= b.weight; if (roll <= 0) return b.id }
+  return BOSS_TIER_WEIGHTS[0].id
+}
+function randRange(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
 const DEV_RESOURCE_FLOOR = 10000
@@ -574,6 +625,16 @@ async function checkMissionAchievements(supabase: any, userId: string, planetId:
 
   if (raidWins >= 1) unlocked.push('first_blood')
   if (raidWins >= 10) unlocked.push('unstoppable')
+
+  // Boss kills
+  const { data: bossKills } = await supabase.from('world_boss_kills')
+    .select('boss_id')
+    .eq('player_id', userId)
+  // deno-lint-ignore no-explicit-any
+  const killedSet = new Set((bossKills ?? []).map((r: any) => r.boss_id))
+  if (killedSet.has('derelict_dreadnought')) unlocked.push('boss_slayer_minor')
+  if (killedSet.has('pirate_flagship')) unlocked.push('boss_slayer_elite')
+  if (killedSet.has('void_leviathan')) unlocked.push('boss_slayer_apex')
 
   return await insertAchievements(supabase, userId, unlocked)
 }
@@ -993,6 +1054,12 @@ async function handleSendProbe(supabase: any, userId: string, planetId: string, 
       if (locationType === 'asteroid_field') metadata.richness = Math.floor(Math.random() * 5) + 1
       if (locationType === 'bandit_camp') metadata.size = Math.random() < 0.5 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large'
       if (locationType === 'debris_field') metadata.salvage_metal = Math.floor(Math.random() * 800 + 200)
+      if (locationType === 'world_boss') {
+        const bossId = rollBossId()
+        metadata.boss_id = bossId
+        metadata.tier = BOSS_FLEETS[bossId].tier
+        name = BOSS_FLEETS[bossId].name
+      }
     }
   }
 
@@ -1170,30 +1237,62 @@ async function handleResolveMission(supabase: any, userId: string, planetId: str
     result.encounter_type = 'mining'
 
   } else if (mission.mission_type === 'raid') {
+    const isBoss = mapEntry?.location_type === 'world_boss'
+    const bossId = isBoss ? (metadata.boss_id as string) : null
+    const boss = bossId ? BOSS_FLEETS[bossId] : null
     const size = (metadata.size as string) ?? 'small'
-    const combat = resolveCombat(fleet, (BANDIT_FLEETS[size] ?? BANDIT_FLEETS.small).ships)
+    const defenderFleet = boss ? boss.ships : (BANDIT_FLEETS[size] ?? BANDIT_FLEETS.small).ships
+    const combat = resolveCombat(fleet, defenderFleet)
     result.combat_log = combat.rounds
     result.ships_lost = combat.attackerLosses
-    result.encounter_type = 'raid'
+    result.encounter_type = boss ? 'world_boss' : 'raid'
+    if (boss) result.boss_id = bossId
     survivingFleet = { ...fleet }
     for (const [t, l] of Object.entries(combat.attackerLosses)) {
       survivingFleet[t] = Math.max(0, (survivingFleet[t] ?? 0) - l)
     }
 
     if (combat.victory) {
-      const mult = size === 'large' ? 5 : size === 'medium' ? 3 : 1
-      result.rewards = {
-        metal: Math.floor((Math.random() * 500 + 300) * mult),
-        gas: Math.floor((Math.random() * 300 + 150) * mult),
-      }
-      // Mark location cleared, schedule respawn in 2–6 hours
-      const respawnHours = 2 + Math.random() * 4
-      if (mapEntry) {
-        await supabase.from('galaxy_map').update({
-          cleared_at: now.toISOString(),
-          respawns_at: new Date(now.getTime() + respawnHours * 3600 * 1000).toISOString(),
-          metadata: { ...metadata, size, respawn_size: size },
-        }).eq('id', mapEntry.id)
+      if (boss && bossId) {
+        const loot = BOSS_LOOT[bossId]
+        result.rewards = {
+          metal: randRange(loot.metal[0], loot.metal[1]),
+          gas: randRange(loot.gas[0], loot.gas[1]),
+        }
+        const respawnHours = randRange(loot.respawnHours[0], loot.respawnHours[1])
+        if (mapEntry) {
+          await supabase.from('galaxy_map').update({
+            cleared_at: now.toISOString(),
+            respawns_at: new Date(now.getTime() + respawnHours * 3600 * 1000).toISOString(),
+            metadata: { ...metadata, boss_id: bossId, tier: boss.tier },
+          }).eq('id', mapEntry.id)
+        }
+        await supabase.from('world_boss_kills').insert({
+          player_id: userId,
+          planet_id: planetId,
+          boss_id: bossId,
+        })
+        await supabase.from('planet_events').insert({
+          planet_id: planetId,
+          event_type: 'world_boss_defeated',
+          message: `Defeated ${boss.name}! +${result.rewards.metal} metal, +${result.rewards.gas} gas`,
+          metadata: { boss_id: bossId, tier: boss.tier, rewards: result.rewards },
+        })
+      } else {
+        const mult = size === 'large' ? 5 : size === 'medium' ? 3 : 1
+        result.rewards = {
+          metal: Math.floor((Math.random() * 500 + 300) * mult),
+          gas: Math.floor((Math.random() * 300 + 150) * mult),
+        }
+        // Mark location cleared, schedule respawn in 2–6 hours
+        const respawnHours = 2 + Math.random() * 4
+        if (mapEntry) {
+          await supabase.from('galaxy_map').update({
+            cleared_at: now.toISOString(),
+            respawns_at: new Date(now.getTime() + respawnHours * 3600 * 1000).toISOString(),
+            metadata: { ...metadata, size, respawn_size: size },
+          }).eq('id', mapEntry.id)
+        }
       }
     } else {
       survivingFleet = Object.fromEntries(Object.keys(fleet).map(k => [k, 0]))
@@ -1713,6 +1812,12 @@ async function handleScanCoordinate(supabase: any, userId: string, planetId: str
       if (locationType === 'asteroid_field') metadata.richness = Math.floor(Math.random() * 5) + 1
       if (locationType === 'bandit_camp') metadata.size = Math.random() < 0.5 ? 'small' : Math.random() < 0.7 ? 'medium' : 'large'
       if (locationType === 'debris_field') metadata.salvage_metal = Math.floor(Math.random() * 800 + 200)
+      if (locationType === 'world_boss') {
+        const bossId = rollBossId()
+        metadata.boss_id = bossId
+        metadata.tier = BOSS_FLEETS[bossId].tier
+        name = BOSS_FLEETS[bossId].name
+      }
     }
   }
 
