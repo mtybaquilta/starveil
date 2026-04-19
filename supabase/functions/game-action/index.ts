@@ -2500,7 +2500,8 @@ async function handleHeraldApexBoss(supabase: any, userId: string, planetId: str
   }
 
   const now = new Date()
-  const activatesAt = new Date(now.getTime() + APEX_EVENT_CONFIG.herald_window_hours * 3600 * 1000)
+  const heraldMs = devMode ? 30 * 1000 : APEX_EVENT_CONFIG.herald_window_hours * 3600 * 1000
+  const activatesAt = new Date(now.getTime() + heraldMs)
   const expiresAt = new Date(activatesAt.getTime() + APEX_EVENT_CONFIG.active_window_hours * 3600 * 1000)
 
   const { data: players } = await supabase.from('players').select('id')
@@ -2577,7 +2578,7 @@ async function handleHeraldApexBoss(supabase: any, userId: string, planetId: str
       await supabase.from('planet_events').insert({
         planet_id: home.id,
         event_type: 'apex_heralded',
-        message: `⚠ ${boss.name} approaches at ${coordinates}. Arrival in ${APEX_EVENT_CONFIG.herald_window_hours}h.`,
+        message: `⚠ ${boss.name} approaches at ${coordinates}. Arrival in ${devMode ? '30s' : APEX_EVENT_CONFIG.herald_window_hours + 'h'}.`,
         metadata: { event_id: event.id, boss_id: bossId, coordinates, activates_at: activatesAt.toISOString() },
       })
     }
