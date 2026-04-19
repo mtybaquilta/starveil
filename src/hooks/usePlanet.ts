@@ -115,6 +115,7 @@ export type PlayerAttack = {
   result: {
     victory?: boolean
     stolen?: { metal: number; gas: number }
+    salvage?: { metal: number; gas: number }
     surviving_fleet?: Record<string, number>
     attacker_losses?: Record<string, number>
     defender_losses?: Record<string, number>
