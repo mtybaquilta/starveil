@@ -93,6 +93,103 @@ export function LeaderboardPage() {
           {' '}Reference: {BOSSES.map((b) => getBossConfig(b.id).name).length} tiers.
         </div>
       )}
+
+      <section className="mt-8">
+        <h2 className="text-sm font-semibold text-white/90 mb-2">Apex Events — Cooperative Kills</h2>
+        <ApexEventsList />
+      </section>
+    </div>
+  )
+}
+
+type ApexEventRow = {
+  id: string
+  boss_id: string
+  phase: string
+  resolved_at: string | null
+  contributions: Array<{
+    player_id: string
+    damage_dealt: number
+    killing_blow: boolean
+    rewarded_metal: number
+    rewarded_gas: number
+    player_username?: string
+  }>
+}
+
+function ApexEventsList() {
+  const [rows, setRows] = useState<ApexEventRow[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: events } = await supabase
+        .from('apex_boss_events')
+        .select('id, boss_id, phase, resolved_at')
+        .in('phase', ['killed', 'escaped'])
+        .order('resolved_at', { ascending: false })
+        .limit(10)
+      if (!events || cancelled) {
+        if (!cancelled) setLoading(false)
+        return
+      }
+      const eventIds = events.map((e) => e.id)
+      const { data: contribs } = eventIds.length
+        ? await supabase
+            .from('world_boss_contributions')
+            .select('event_id, player_id, damage_dealt, killing_blow, rewarded_metal, rewarded_gas')
+            .in('event_id', eventIds)
+        : { data: [] as any[] }
+      const playerIds = Array.from(new Set((contribs ?? []).map((c) => c.player_id)))
+      const { data: players } = playerIds.length
+        ? await supabase.from('players').select('id, username').in('id', playerIds)
+        : { data: [] as { id: string; username: string }[] }
+      const nameMap = new Map((players ?? []).map((p) => [p.id, p.username]))
+      if (cancelled) return
+      setRows(
+        events.map((e) => ({
+          ...e,
+          contributions: (contribs ?? [])
+            .filter((c) => c.event_id === e.id)
+            .sort((a, b) => b.damage_dealt - a.damage_dealt)
+            .map((c) => ({ ...c, player_username: nameMap.get(c.player_id) })),
+        })),
+      )
+      setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (loading) return <div className="text-xs text-slate-500">Loading apex events...</div>
+  if (rows.length === 0) return <div className="text-xs text-white/40">No apex events resolved yet.</div>
+  return (
+    <div className="space-y-3">
+      {rows.map((r) => {
+        let bossName = r.boss_id
+        try {
+          bossName = getBossConfig(r.boss_id).name
+        } catch { /* unknown boss id */ }
+        return (
+          <div key={r.id} className="p-3 rounded bg-white/5 border border-white/10">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm font-medium text-slate-200">{bossName}</span>
+              <span className={`text-[10px] uppercase ${r.phase === 'killed' ? 'text-fuchsia-400' : 'text-white/40'}`}>{r.phase}</span>
+            </div>
+            <div className="text-[10px] text-white/50">{r.resolved_at ? new Date(r.resolved_at).toLocaleString() : ''}</div>
+            <ul className="mt-2 space-y-0.5 text-xs">
+              {r.contributions.map((c) => (
+                <li key={c.player_id} className={c.killing_blow ? 'text-fuchsia-300' : 'text-white/70'}>
+                  {c.player_username ?? c.player_id.slice(0, 8)} — {c.damage_dealt} dmg · +{c.rewarded_metal} metal, +{c.rewarded_gas} gas
+                  {c.killing_blow ? ' (killing blow)' : ''}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -105,6 +105,15 @@ Deno.serve(async (req: Request) => {
     if (action === 'spawn_world_boss') {
       return await handleSpawnWorldBoss(supabase, user.id, planetId, !!devMode, body.bossId, corsHeaders)
     }
+    if (action === 'herald_apex_boss') {
+      return await handleHeraldApexBoss(supabase, user.id, planetId, !!devMode, body.bossId, corsHeaders)
+    }
+    if (action === 'activate_apex_event') {
+      return await handleActivateApexEvent(supabase, body.eventId, corsHeaders)
+    }
+    if (action === 'resolve_apex_event') {
+      return await handleResolveApexEvent(supabase, body.eventId, corsHeaders)
+    }
 
     return new Response(JSON.stringify({ error: 'Unknown action' }), {
       status: 400,
@@ -345,6 +354,66 @@ function randRange(min: number, max: number): number {
 }
 
 const DEV_RESOURCE_FLOOR = 10000
+
+// ============================================================
+// Apex event pure helpers (mirror of src/lib/apexContribution.ts).
+// Keep in sync with the client-side version.
+// ============================================================
+
+type ApexState = {
+  hp_remaining: number
+  hp_max: number
+  damage_contributors: Record<string, number>
+}
+
+function applyApexDamage(state: ApexState, playerId: string, rawDamage: number) {
+  if (rawDamage <= 0 || state.hp_remaining <= 0) {
+    return { next: state, effectiveDamage: 0, killed: state.hp_remaining <= 0, killingBlow: false }
+  }
+  const effective = Math.min(rawDamage, state.hp_remaining)
+  const nextHp = state.hp_remaining - effective
+  const prior = state.damage_contributors[playerId] ?? 0
+  const next: ApexState = {
+    hp_max: state.hp_max,
+    hp_remaining: nextHp,
+    damage_contributors: { ...state.damage_contributors, [playerId]: prior + effective },
+  }
+  return { next, effectiveDamage: effective, killed: nextHp <= 0, killingBlow: nextHp <= 0 }
+}
+
+function computeApexRewards(
+  contributors: Record<string, number>,
+  pool: { metal: number; gas: number },
+  killerId: string | null,
+  killingBlowBonus: number,
+) {
+  const entries = Object.entries(contributors).filter(([, d]) => d > 0)
+  if (entries.length === 0) return {} as Record<string, { metal: number; gas: number; killing_blow: boolean }>
+  const weights: Record<string, number> = {}
+  let total = 0
+  for (const [pid, dmg] of entries) {
+    const w = pid === killerId ? dmg * killingBlowBonus : dmg
+    weights[pid] = w
+    total += w
+  }
+  const out: Record<string, { metal: number; gas: number; killing_blow: boolean }> = {}
+  for (const [pid] of entries) {
+    const share = weights[pid] / total
+    out[pid] = {
+      metal: Math.floor(share * pool.metal),
+      gas: Math.floor(share * pool.gas),
+      killing_blow: pid === killerId,
+    }
+  }
+  return out
+}
+
+const APEX_EVENT_CONFIG = {
+  herald_window_hours: 2,
+  active_window_hours: 24,
+  escape_loot_multiplier: 0.5,
+  killing_blow_bonus: 1.1,
+}
 
 // ============================================================
 // Utility helpers
@@ -1241,8 +1310,81 @@ async function handleResolveMission(supabase: any, userId: string, planetId: str
 
   } else if (mission.mission_type === 'raid') {
     const isBoss = mapEntry?.location_type === 'world_boss'
+    const isApexActive = isBoss && !!metadata.event_id && metadata.phase === 'active'
     const bossId = isBoss ? (metadata.boss_id as string) : null
     const boss = bossId ? BOSS_FLEETS[bossId] : null
+
+    if (isApexActive && boss && bossId) {
+      // --- Cooperative apex branch: contribute damage to shared HP pool ---
+      const { data: eventRow } = await supabase.from('apex_boss_events').select('*').eq('id', metadata.event_id).single()
+      if (!eventRow || eventRow.phase !== 'active' || new Date(eventRow.expires_at) <= now) {
+        result.encounter_type = 'apex_window_closed'
+        result.combat_log = []
+        result.ships_lost = {}
+        result.rewards = { metal: 0, gas: 0 }
+        // survivingFleet stays full — fleet never engaged
+      } else {
+        const combat = resolveCombat(fleet, boss.ships)
+        let waveDamage = 0
+        for (const round of combat.rounds) {
+          // deno-lint-ignore no-explicit-any
+          for (const fire of round.attackerFire as any[]) waveDamage += fire.damage
+        }
+        survivingFleet = { ...fleet }
+        for (const [t, l] of Object.entries(combat.attackerLosses)) {
+          survivingFleet[t] = Math.max(0, (survivingFleet[t] ?? 0) - l)
+        }
+
+        const { data: anchor } = await supabase.from('galaxy_map').select('id, metadata').eq('id', eventRow.galaxy_map_id).single()
+        // deno-lint-ignore no-explicit-any
+        const anchorMeta = (anchor?.metadata ?? {}) as Record<string, any>
+        const state: ApexState = {
+          hp_max: anchorMeta.hp_max,
+          hp_remaining: anchorMeta.hp_remaining,
+          damage_contributors: anchorMeta.damage_contributors ?? {},
+        }
+        const applied = applyApexDamage(state, userId, waveDamage)
+
+        await supabase.from('galaxy_map').update({
+          metadata: { ...anchorMeta, hp_remaining: applied.next.hp_remaining, damage_contributors: applied.next.damage_contributors },
+        }).eq('id', eventRow.galaxy_map_id)
+
+        const { data: mirrors } = await supabase.from('galaxy_map').select('id, metadata').eq('location_type', 'world_boss')
+        for (const m of mirrors ?? []) {
+          // deno-lint-ignore no-explicit-any
+          const mmeta = (m.metadata ?? {}) as Record<string, any>
+          if (mmeta.event_id === eventRow.id && m.id !== eventRow.galaxy_map_id) {
+            await supabase.from('galaxy_map').update({
+              metadata: { ...mmeta, hp_remaining: applied.next.hp_remaining, damage_contributors: applied.next.damage_contributors },
+            }).eq('id', m.id)
+          }
+        }
+
+        result.encounter_type = 'apex_contribution'
+        result.boss_id = bossId
+        result.event_id = eventRow.id
+        result.combat_log = combat.rounds
+        result.ships_lost = combat.attackerLosses
+        result.damage_dealt = applied.effectiveDamage
+        result.hp_remaining = applied.next.hp_remaining
+        result.rewards = { metal: 0, gas: 0 } // granted at event finalization
+
+        if (applied.killed) {
+          await finalizeApexEvent(supabase, eventRow.id, userId)
+          result.killing_blow = true
+        }
+
+        await supabase.from('planet_events').insert({
+          planet_id: planetId,
+          event_type: 'apex_contribution',
+          message: applied.killed
+            ? `Killing blow on ${boss.name}! Dealt ${applied.effectiveDamage} damage`
+            : `Dealt ${applied.effectiveDamage} damage to ${boss.name} (HP: ${applied.next.hp_remaining}/${applied.next.hp_max})`,
+          metadata: { event_id: eventRow.id, damage: applied.effectiveDamage, killing_blow: applied.killed },
+        })
+      }
+    } else {
+    // --- Solo/bandit path (unchanged) ---
     const size = (metadata.size as string) ?? 'small'
     const defenderFleet = boss ? boss.ships : (BANDIT_FLEETS[size] ?? BANDIT_FLEETS.small).ships
     const combat = resolveCombat(fleet, defenderFleet)
@@ -1301,6 +1443,7 @@ async function handleResolveMission(supabase: any, userId: string, planetId: str
       survivingFleet = Object.fromEntries(Object.keys(fleet).map(k => [k, 0]))
       result.rewards = { metal: 0, gas: 0 }
     }
+    } // close solo/bandit path
 
   } else if (mission.mission_type === 'salvage') {
     const totalCargo = fleetTotalStat(fleet, 'cargo')
@@ -2327,4 +2470,236 @@ async function handleSpawnTestOpponent(supabase: any, userId: string, planetId: 
       password: 'test-opponent-password-12345',
     },
   }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// ============================================================
+// Apex event handlers
+// ============================================================
+
+// deno-lint-ignore no-explicit-any
+async function handleHeraldApexBoss(supabase: any, userId: string, planetId: string, devMode: boolean, bossIdArg: string | undefined, cors: Record<string, string>) {
+  if (!devMode) {
+    return new Response(JSON.stringify({ error: 'Dev mode only' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+  const { data: existingEvent } = await supabase
+    .from('apex_boss_events')
+    .select('id, phase')
+    .in('phase', ['heralded', 'active'])
+    .maybeSingle()
+  if (existingEvent) {
+    return new Response(JSON.stringify({ error: `Apex event already ${existingEvent.phase}` }), { status: 409, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const bossId = bossIdArg && BOSS_FLEETS[bossIdArg]?.tier === 'apex' ? bossIdArg : 'void_leviathan'
+  const boss = BOSS_FLEETS[bossId]
+  const coordinates = '1:50:50'
+
+  let hpMax = 0
+  for (const unit of Object.values(boss.ships) as Array<{ count: number; hp: number }>) {
+    hpMax += unit.count * unit.hp
+  }
+
+  const now = new Date()
+  const activatesAt = new Date(now.getTime() + APEX_EVENT_CONFIG.herald_window_hours * 3600 * 1000)
+  const expiresAt = new Date(activatesAt.getTime() + APEX_EVENT_CONFIG.active_window_hours * 3600 * 1000)
+
+  const { data: players } = await supabase.from('players').select('id')
+  if (!players || players.length === 0) {
+    return new Response(JSON.stringify({ error: 'No players found' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const metadataBase = {
+    boss_id: bossId,
+    tier: boss.tier,
+    phase: 'heralded' as const,
+    hp_max: hpMax,
+    hp_remaining: hpMax,
+    damage_contributors: {} as Record<string, number>,
+    activates_at: activatesAt.toISOString(),
+    expires_at: expiresAt.toISOString(),
+  }
+
+  const firstPlayer = players[0]
+  // Delete any stale entry at this coord for firstPlayer (e.g. from prior resolved events) to avoid unique conflict
+  await supabase.from('galaxy_map').delete().eq('player_id', firstPlayer.id).eq('coordinates', coordinates)
+  const { data: anchor, error: anchorErr } = await supabase.from('galaxy_map').insert({
+    player_id: firstPlayer.id,
+    coordinates,
+    visibility: 'revealed',
+    location_type: 'world_boss',
+    name: boss.name,
+    metadata: metadataBase,
+    revealed_at: now.toISOString(),
+  }).select('id').single()
+  if (anchorErr || !anchor) {
+    return new Response(JSON.stringify({ error: 'Failed to anchor event', detail: anchorErr?.message }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const { data: event, error: evErr } = await supabase.from('apex_boss_events').insert({
+    boss_id: bossId,
+    galaxy_map_id: anchor.id,
+    phase: 'heralded',
+    heralded_at: now.toISOString(),
+    activates_at: activatesAt.toISOString(),
+    expires_at: expiresAt.toISOString(),
+  }).select('id').single()
+  if (evErr || !event) {
+    return new Response(JSON.stringify({ error: 'Failed to create event', detail: evErr?.message }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  await supabase.from('galaxy_map').update({
+    metadata: { ...metadataBase, event_id: event.id },
+  }).eq('id', anchor.id)
+
+  // deno-lint-ignore no-explicit-any
+  const otherPlayers = players.filter((p: any) => p.id !== firstPlayer.id)
+  if (otherPlayers.length > 0) {
+    // Clean then insert to respect unique (player_id, coordinates)
+    for (const p of otherPlayers) {
+      await supabase.from('galaxy_map').delete().eq('player_id', p.id).eq('coordinates', coordinates)
+      await supabase.from('galaxy_map').insert({
+        player_id: p.id,
+        coordinates,
+        visibility: 'revealed',
+        location_type: 'world_boss',
+        name: boss.name,
+        metadata: { ...metadataBase, event_id: event.id },
+        revealed_at: now.toISOString(),
+      })
+    }
+  }
+
+  // Notify all players via planet_events on their first planet
+  // deno-lint-ignore no-explicit-any
+  for (const p of players as any[]) {
+    const { data: home } = await supabase.from('planets').select('id').eq('player_id', p.id).order('created_at', { ascending: true }).limit(1).maybeSingle()
+    if (home) {
+      await supabase.from('planet_events').insert({
+        planet_id: home.id,
+        event_type: 'apex_heralded',
+        message: `⚠ ${boss.name} approaches at ${coordinates}. Arrival in ${APEX_EVENT_CONFIG.herald_window_hours}h.`,
+        metadata: { event_id: event.id, boss_id: bossId, coordinates, activates_at: activatesAt.toISOString() },
+      })
+    }
+  }
+
+  return new Response(JSON.stringify({
+    success: true,
+    event_id: event.id,
+    boss_id: bossId,
+    coordinates,
+    activates_at: activatesAt.toISOString(),
+    expires_at: expiresAt.toISOString(),
+  }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleActivateApexEvent(supabase: any, eventId: string, cors: Record<string, string>) {
+  const { data: event } = await supabase.from('apex_boss_events').select('*').eq('id', eventId).single()
+  if (!event) {
+    return new Response(JSON.stringify({ error: 'Event not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+  if (event.phase !== 'heralded') {
+    return new Response(JSON.stringify({ success: true, already: event.phase }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+  if (new Date(event.activates_at) > new Date()) {
+    return new Response(JSON.stringify({ error: 'Not yet' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  await supabase.from('apex_boss_events').update({ phase: 'active' }).eq('id', eventId)
+
+  const { data: entries } = await supabase.from('galaxy_map').select('id, metadata').eq('location_type', 'world_boss')
+  for (const row of entries ?? []) {
+    // deno-lint-ignore no-explicit-any
+    const m = (row.metadata ?? {}) as Record<string, any>
+    if (m.event_id === eventId) {
+      await supabase.from('galaxy_map').update({ metadata: { ...m, phase: 'active' } }).eq('id', row.id)
+    }
+  }
+
+  return new Response(JSON.stringify({ success: true, phase: 'active' }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleResolveApexEvent(supabase: any, eventId: string, cors: Record<string, string>) {
+  const { data: event } = await supabase.from('apex_boss_events').select('*').eq('id', eventId).single()
+  if (!event) return new Response(JSON.stringify({ error: 'Event not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+  if (event.phase === 'killed' || event.phase === 'escaped') {
+    return new Response(JSON.stringify({ success: true, already: event.phase }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+  if (event.phase !== 'active' || new Date(event.expires_at) > new Date()) {
+    return new Response(JSON.stringify({ error: 'Not yet expired' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+  await finalizeApexEvent(supabase, eventId, null)
+  return new Response(JSON.stringify({ success: true, phase: 'escaped' }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// deno-lint-ignore no-explicit-any
+async function finalizeApexEvent(supabase: any, eventId: string, killerUserId: string | null) {
+  const { data: event } = await supabase.from('apex_boss_events').select('*').eq('id', eventId).single()
+  if (!event || event.phase === 'killed' || event.phase === 'escaped') return
+
+  const { data: anchor } = await supabase.from('galaxy_map').select('id, metadata').eq('id', event.galaxy_map_id).single()
+  // deno-lint-ignore no-explicit-any
+  const meta = (anchor?.metadata ?? {}) as Record<string, any>
+  const contributors = (meta.damage_contributors ?? {}) as Record<string, number>
+  const boss = BOSS_FLEETS[event.boss_id]
+  const lootRange = BOSS_LOOT[event.boss_id]
+  const killed = killerUserId !== null
+  const mult = killed ? 1 : APEX_EVENT_CONFIG.escape_loot_multiplier
+  const poolMetal = Math.floor(randRange(lootRange.metal[0], lootRange.metal[1]) * mult)
+  const poolGas = Math.floor(randRange(lootRange.gas[0], lootRange.gas[1]) * mult)
+  const rewards = computeApexRewards(
+    contributors,
+    { metal: poolMetal, gas: poolGas },
+    killed ? killerUserId : null,
+    APEX_EVENT_CONFIG.killing_blow_bonus,
+  )
+
+  const contribRows = Object.entries(rewards).map(([playerId, r]) => ({
+    event_id: eventId,
+    player_id: playerId,
+    damage_dealt: contributors[playerId] ?? 0,
+    rewarded_metal: r.metal,
+    rewarded_gas: r.gas,
+    killing_blow: r.killing_blow,
+  }))
+  if (contribRows.length > 0) {
+    await supabase.from('world_boss_contributions').upsert(contribRows, { onConflict: 'event_id,player_id' })
+  }
+
+  for (const [playerId, r] of Object.entries(rewards)) {
+    const { data: home } = await supabase.from('planets').select('id, metal_amount, gas_amount').eq('player_id', playerId).order('created_at', { ascending: true }).limit(1).maybeSingle()
+    if (!home) continue
+    await supabase.from('planets').update({
+      metal_amount: (home.metal_amount ?? 0) + r.metal,
+      gas_amount: (home.gas_amount ?? 0) + r.gas,
+    }).eq('id', home.id)
+    await supabase.from('planet_events').insert({
+      planet_id: home.id,
+      event_type: killed ? 'apex_boss_defeated' : 'apex_boss_escaped',
+      message: killed
+        ? `Apex ${boss.name} slain! Your share: +${r.metal} metal, +${r.gas} gas${r.killing_blow ? ' (killing blow)' : ''}`
+        : `Apex ${boss.name} escaped. Partial share: +${r.metal} metal, +${r.gas} gas`,
+      metadata: { event_id: eventId, boss_id: event.boss_id, ...r },
+    })
+  }
+
+  await supabase.from('apex_boss_events').update({
+    phase: killed ? 'killed' : 'escaped',
+    resolved_at: new Date().toISOString(),
+    killing_player: killed ? killerUserId : null,
+  }).eq('id', eventId)
+
+  const { data: entries } = await supabase.from('galaxy_map').select('id, metadata').eq('location_type', 'world_boss')
+  for (const row of entries ?? []) {
+    // deno-lint-ignore no-explicit-any
+    const m = (row.metadata ?? {}) as Record<string, any>
+    if (m.event_id === eventId) {
+      await supabase.from('galaxy_map').update({
+        cleared_at: new Date().toISOString(),
+        metadata: { ...m, phase: killed ? 'killed' : 'escaped' },
+      }).eq('id', row.id)
+    }
+  }
 }

@@ -83,3 +83,17 @@ export const TIER_WEIGHTS: Record<BossTier, number> = {
   elite: 30,
   apex: 10,
 }
+
+export type ApexEventConfig = {
+  herald_window_hours: number
+  active_window_hours: number
+  escape_loot_multiplier: number
+  killing_blow_bonus: number
+}
+
+export const APEX_EVENT_CONFIG: ApexEventConfig = {
+  herald_window_hours: 2,
+  active_window_hours: 24,
+  escape_loot_multiplier: 0.5,
+  killing_blow_bonus: 1.1,
+}

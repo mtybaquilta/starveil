@@ -3,6 +3,7 @@ import { ResourceBar } from './ResourceBar'
 import { QueueStrip } from './QueueStrip'
 import { Sidebar } from './Sidebar'
 import { AchievementToast } from './AchievementToast'
+import { ApexEventBanner } from './ApexEventBanner'
 import { PlanetSelector } from './PlanetSelector'
 import { usePlanets } from '../hooks/usePlanets'
 import { usePlanet } from '../hooks/usePlanet'
@@ -76,6 +77,7 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col">
       <AchievementToast achievements={achievements} />
+      <ApexEventBanner />
       <div className="flex items-center bg-slate-950/90 border-b border-slate-800/50">
         <ResourceBar
           metal={resources.metal}
