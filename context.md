@@ -12,6 +12,8 @@ Recent additions:
 
 - Three-tier world boss framework (minor / elite / apex).
 - Cooperative apex event system with herald-then-spawn lifecycle, shared HP pool, proportional-damage rewards, and a +10% killing-blow bonus — the game's first genuinely global PvE loop.
+- **Multi-planet dashboard** on the Overview page — at-a-glance rows for every owned colony (resources, rates, energy %, weather, construction / ship / mission queues); doubles as a planet selector.
+- **Anomalies / Expeditions** — discoverable galaxy-map events (5 v1 types: Resource Cache, Derelict Probe, Signal Ghost, Pirate Ambush, Void Echo) with race-to-claim resolution and RNG reward tables. First fleet to arrive wins; late arrivals return empty.
 
 ## Tech Stack
 
@@ -23,13 +25,13 @@ Recent additions:
 
 The app uses a left sidebar with the following entries (see `src/components/Sidebar.tsx`):
 
-- **Overview** — Planet dashboard: summary of resources, active weather, production rates, recent planet events, and at-a-glance status for the currently selected colony.
+- **Overview** — Multi-colony dashboard (one row per owned planet with live rates, energy %, weather, and queue slots) plus details for the active colony: weather display and recent events. The dashboard rows act as a planet selector.
 - **Buildings** — Construct and upgrade planetary buildings (mines, harvesters, solar array, shipyard, labs, storage, defensive structures). Drives the construction queue.
 - **Resources** — Detailed breakdown of metal / gas / energy production: base rates, research bonuses, weather modifiers, and energy balance.
 - **Shipyard** — Queue ship and planetary-defense builds. Gated by Shipyard building level and tech prerequisites.
 - **Fleet** — View your ship inventory on this planet and deploy ships into missions or attacks from a single screen.
-- **Galaxy Map** — Zoomable 2D map. Run Radar scans to detect coordinates, send Probes to reveal what's there (asteroids, bandits, habitable planets, enemy colonies, debris, world bosses). Also the launch point for raids, colonizations, and (in dev mode) spawning opponents / heralding apex bosses.
-- **Missions** — Compose and dispatch non-PvP missions (mining, raiding bandit camps / world bosses, salvaging debris). Shows active missions with countdowns and boss warning panels (including the cooperative apex panel).
+- **Galaxy Map** — Zoomable 2D map. Run Radar scans to detect coordinates, send Probes to reveal what's there (asteroids, bandits, habitable planets, enemy colonies, debris, world bosses, anomalies). Also the launch point for raids, colonizations, expeditions, and (in dev mode) spawning opponents / heralding apex bosses / spawning anomalies.
+- **Missions** — Compose and dispatch non-PvP missions (mining, raiding bandit camps / world bosses, salvaging debris, expeditions to anomalies). Shows active missions with countdowns and boss warning panels (including the cooperative apex panel).
 - **Research** — Spend metal / gas at the Research Lab to unlock tech that boosts production, combat stats, or unlocks ships / buildings.
 - **Achievements** — Unlockable milestones; badge in nav shows `earned / total` progress.
 - **Leaderboard** — Rankings for world boss kills per tier, plus the Apex Events section with per-contributor damage and killing-blow highlighting.
@@ -49,6 +51,6 @@ Outside the main content area, a few components are always present:
 
 - **Economy loop** — Build mines and harvesters → power with solar array → research multipliers → upgrade storage → fund ships and buildings.
 - **Exploration loop** — Radar Array detects coordinates → Probes reveal contents → mission or raid targets become available on the map.
-- **PvE loop (solo)** — Raid bandit camps, mine asteroids, salvage debris, hunt minor / elite world bosses for resources and achievements.
+- **PvE loop (solo)** — Raid bandit camps, mine asteroids, salvage debris, hunt minor / elite world bosses, and race rival fleets to claim anomalies for resources and achievements.
 - **PvE loop (cooperative)** — Apex world boss events herald globally, all players see them on the map, anyone can dispatch fleets during the active window; rewards split proportionally by damage with a killing-blow bonus.
 - **PvP loop** — Scan enemy coordinates, probe to confirm, dispatch attack fleets with combat reports returning to the Inbox.
