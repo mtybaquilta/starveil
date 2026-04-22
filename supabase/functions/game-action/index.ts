@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { ANOMALIES, ANOMALY_TYPES, rollAnomalyReward, type AnomalyType } from './anomalies.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -113,6 +114,9 @@ Deno.serve(async (req: Request) => {
     }
     if (action === 'resolve_apex_event') {
       return await handleResolveApexEvent(supabase, body.eventId, corsHeaders)
+    }
+    if (action === 'spawn_anomaly') {
+      return await handleSpawnAnomaly(supabase, user.id, planetId, !!devMode, body.anomalyType, corsHeaders)
     }
 
     return new Response(JSON.stringify({ error: 'Unknown action' }), {
@@ -255,6 +259,7 @@ const MISSION_CONFIGS: Record<string, { requiredShips: string[]; minDurationSeco
   mining:  { requiredShips: ['harvester'],     minDurationSeconds: 120 },
   raid:    { requiredShips: ['small_fighter'], minDurationSeconds: 90  },
   salvage: { requiredShips: ['small_cargo'],   minDurationSeconds: 60  },
+  expedition: { requiredShips: ['small_fighter', 'small_cargo', 'harvester'], minDurationSeconds: 60 },
 }
 
 const TECH_CONFIGS: Record<string, {
@@ -1457,6 +1462,11 @@ async function handleResolveMission(supabase: any, userId: string, planetId: str
     if (mapEntry) {
       await supabase.from('galaxy_map').update({ cleared_at: now.toISOString(), respawns_at: null }).eq('id', mapEntry.id)
     }
+  } else if (mission.mission_type === 'expedition') {
+    const expo = await resolveExpedition(supabase, mission, mapEntry, metadata)
+    result = expo.result
+    result.rewards = expo.rewards
+    survivingFleet = expo.survivingFleet
   }
 
   // Return surviving ships
@@ -2702,5 +2712,125 @@ async function finalizeApexEvent(supabase: any, eventId: string, killerUserId: s
         metadata: { ...m, phase: killed ? 'killed' : 'escaped' },
       }).eq('id', row.id)
     }
+  }
+}
+
+// ============================================================
+// Anomaly / Expedition handlers
+// ============================================================
+
+// deno-lint-ignore no-explicit-any
+async function handleSpawnAnomaly(supabase: any, userId: string, planetId: string, devMode: boolean, anomalyType: string | undefined, cors: Record<string, string>) {
+  if (!devMode) {
+    return new Response(JSON.stringify({ error: 'Dev mode only' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const { data: planet } = await supabase.from('planets').select('coordinates').eq('id', planetId).eq('player_id', userId).single()
+  if (!planet) return new Response(JSON.stringify({ error: 'Planet not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
+
+  const chosenType: AnomalyType = (anomalyType && ANOMALIES[anomalyType as AnomalyType])
+    ? anomalyType as AnomalyType
+    : ANOMALY_TYPES[Math.floor(Math.random() * ANOMALY_TYPES.length)]
+  const cfg = ANOMALIES[chosenType]
+
+  const home = parseCoord(planet.coordinates)
+  let targetCoords: string | null = null
+  for (let i = 0; i < 30; i++) {
+    const dx = Math.floor(Math.random() * 11) - 5
+    const dy = Math.floor(Math.random() * 11) - 5
+    if (dx === 0 && dy === 0) continue
+    const coord = `${home.galaxy}:${Math.max(1, home.system + dx)}:${Math.max(1, home.position + dy)}`
+    const { data: existing } = await supabase.from('galaxy_map')
+      .select('id, location_type')
+      .eq('coordinates', coord)
+      .limit(1)
+      .maybeSingle()
+    if (!existing || !existing.location_type) {
+      targetCoords = coord
+      break
+    }
+  }
+  if (!targetCoords) {
+    return new Response(JSON.stringify({ error: 'No free coordinate nearby' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } })
+  }
+
+  const anomalyId = crypto.randomUUID()
+  const now = new Date().toISOString()
+  const metadata = { anomaly_id: anomalyId, anomaly_type: chosenType, spawned_at: now }
+
+  // Insert a galaxy_map row for every player at the shared coordinate (race-to-claim)
+  const { data: players } = await supabase.from('players').select('id')
+  for (const p of (players ?? []) as Array<{ id: string }>) {
+    await supabase.from('galaxy_map').delete().eq('player_id', p.id).eq('coordinates', targetCoords)
+    await supabase.from('galaxy_map').insert({
+      player_id: p.id,
+      coordinates: targetCoords,
+      visibility: 'revealed',
+      location_type: 'anomaly',
+      name: cfg.name,
+      metadata,
+      revealed_at: now,
+    })
+  }
+
+  await supabase.from('planet_events').insert({
+    planet_id: planetId,
+    event_type: 'system',
+    message: `[DEV] Spawned ${cfg.name} at ${targetCoords}`,
+    metadata: { anomaly_id: anomalyId, anomaly_type: chosenType, coordinates: targetCoords },
+  })
+
+  return new Response(JSON.stringify({ success: true, anomaly_id: anomalyId, anomaly_type: chosenType, coordinates: targetCoords }), { headers: { ...cors, 'Content-Type': 'application/json' } })
+}
+
+// Called from handleResolveMission for mission_type === 'expedition'.
+// Returns { rewards, result } shape the caller can merge into its `result`.
+// deno-lint-ignore no-explicit-any
+async function resolveExpedition(supabase: any, mission: any, mapEntry: any, metadata: Record<string, any>): Promise<{ rewards: { metal: number; gas: number }; survivingFleet: Record<string, number>; result: any }> {
+  const fleet: Record<string, number> = mission.fleet
+  const anomalyId = metadata?.anomaly_id as string | undefined
+  const anomalyType = metadata?.anomaly_type as AnomalyType | undefined
+
+  // If the anomaly row already cleared (another player claimed it first), return empty.
+  if (!mapEntry || mapEntry.location_type !== 'anomaly' || !anomalyId || !anomalyType || !ANOMALIES[anomalyType]) {
+    return {
+      rewards: { metal: 0, gas: 0 },
+      survivingFleet: { ...fleet },
+      result: { encounter_type: 'expedition_missed', anomaly_id: anomalyId, flavor: 'Arrived to empty space — another fleet beat you to it.' },
+    }
+  }
+
+  // Race-to-claim guard: attempt to delete across all players for this anomaly_id.
+  // If we delete zero rows, someone else already cleared it.
+  const { data: rows } = await supabase.from('galaxy_map').select('id, player_id, metadata').eq('location_type', 'anomaly')
+  const matching = (rows ?? []).filter((r: any) => r.metadata?.anomaly_id === anomalyId)
+  if (matching.length === 0) {
+    return {
+      rewards: { metal: 0, gas: 0 },
+      survivingFleet: { ...fleet },
+      result: { encounter_type: 'expedition_missed', anomaly_id: anomalyId, flavor: 'Arrived to empty space — another fleet beat you to it.' },
+    }
+  }
+  for (const r of matching) {
+    await supabase.from('galaxy_map').delete().eq('id', r.id)
+  }
+
+  const roll = rollAnomalyReward(anomalyType, fleet)
+  const survivingFleet: Record<string, number> = { ...fleet }
+  for (const [ship, lost] of Object.entries(roll.shipsLost)) {
+    survivingFleet[ship] = Math.max(0, (survivingFleet[ship] ?? 0) - lost)
+  }
+
+  return {
+    rewards: { metal: roll.metal, gas: roll.gas },
+    survivingFleet,
+    result: {
+      encounter_type: 'expedition',
+      anomaly_id: anomalyId,
+      anomaly_type: anomalyType,
+      flavor: roll.flavor,
+      research: roll.research,
+      ships_lost: roll.shipsLost,
+    },
   }
 }
