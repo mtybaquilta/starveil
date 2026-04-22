@@ -12,6 +12,7 @@ const MISSION_TYPE_TARGETS: Record<string, string[]> = {
   mining:  ['asteroid_field'],
   raid:    ['bandit_camp', 'world_boss'],
   salvage: ['debris_field', 'asteroid_field', 'bandit_camp', 'empty'],
+  expedition: ['anomaly'],
 }
 
 function getTargetOptions(missionType: string, galaxyMap: GalaxyMapEntry[]): GalaxyMapEntry[] {

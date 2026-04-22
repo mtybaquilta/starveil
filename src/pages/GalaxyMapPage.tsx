@@ -3,6 +3,7 @@ import { useOutletContext, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { IS_DEV_MODE } from '../lib/devMode'
 import { SHIPS } from '../config/ships'
+import { ANOMALIES, type AnomalyType } from '../config/anomalies'
 import type { GameContext } from '../components/Layout'
 import type { GalaxyMapEntry, PlayerAttack } from '../hooks/usePlanet'
 
@@ -97,6 +98,20 @@ function PlayerColonyTile() {
   )
 }
 
+function AnomalyTile({ icon }: { icon: string }) {
+  return (
+    <div
+      className="w-[30px] h-[30px] rounded-full flex items-center justify-center"
+      style={{
+        background: 'radial-gradient(circle at 35% 35%, #22d3ee, #0e7490 70%)',
+        boxShadow: '0 0 12px rgba(34,211,238,0.45)',
+      }}
+    >
+      <span className="text-[14px] leading-none">{icon}</span>
+    </div>
+  )
+}
+
 function WorldBossTile({ tier }: { tier?: string }) {
   const glow = tier === 'apex'
     ? '0 0 18px rgba(217,70,239,0.6)'
@@ -143,6 +158,8 @@ function LocationNode({
             ? 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-slate-400/12 bg-gradient-to-br from-slate-600/30 to-slate-800/45'
           : type === 'world_boss'
             ? 'w-[52px] h-[52px] rounded-full border-[1.5px] border-fuchsia-500/40 bg-gradient-to-br from-fuchsia-950/40 to-slate-950/60'
+          : type === 'anomaly'
+            ? 'w-[50px] h-[50px] rounded-full border-[1.5px] border-cyan-400/35 bg-gradient-to-br from-cyan-950/40 to-slate-950/60'
             : 'w-[50px] h-[50px] rounded-lg border-[1.5px] border-slate-700/20 bg-slate-800/30'
 
   const labelColor = isDetected
@@ -153,6 +170,7 @@ function LocationNode({
     : type === 'bandit_camp' ? 'text-red-400'
     : type === 'debris_field' ? 'text-slate-400'
     : type === 'world_boss' ? 'text-fuchsia-400'
+    : type === 'anomaly' ? 'text-cyan-300'
     : 'text-slate-500'
 
   return (
@@ -176,6 +194,11 @@ function LocationNode({
         {!isDetected && type === 'bandit_camp' && <BanditTile />}
         {!isDetected && type === 'debris_field' && <DebrisTile />}
         {!isDetected && type === 'world_boss' && <WorldBossTile tier={(entry.metadata as Record<string, unknown>)?.tier as string | undefined} />}
+        {!isDetected && type === 'anomaly' && (() => {
+          const at = (entry.metadata as Record<string, unknown>)?.anomaly_type as AnomalyType | undefined
+          const icon = at && ANOMALIES[at] ? ANOMALIES[at].icon : '✨'
+          return <AnomalyTile icon={icon} />
+        })()}
       </div>
       <div className={`text-[8px] font-semibold text-center max-w-[70px] leading-tight ${labelColor}`}>
         {isDetected ? entry.coordinates : entry.name ?? entry.location_type?.replace(/_/g, ' ') ?? entry.coordinates}
@@ -236,6 +259,7 @@ function Minimap({
       case 'bandit_camp': return 'bg-red-500'
       case 'debris_field': return 'bg-slate-500'
       case 'world_boss': return 'bg-fuchsia-500'
+      case 'anomaly': return 'bg-cyan-400'
       default: return 'bg-slate-600'
     }
   }
@@ -314,6 +338,7 @@ function DetailPanel({
     : type === 'bandit_camp' ? 'Bandit Camp'
     : type === 'debris_field' ? 'Debris Field'
     : type === 'world_boss' ? 'World Boss'
+    : type === 'anomaly' ? 'Anomaly'
     : 'Unknown'
 
   const titleColor = isDetected ? 'text-yellow-500/80'
@@ -323,6 +348,7 @@ function DetailPanel({
     : type === 'bandit_camp' ? 'text-red-400'
     : type === 'debris_field' ? 'text-slate-300'
     : type === 'world_boss' ? 'text-fuchsia-400'
+    : type === 'anomaly' ? 'text-cyan-300'
     : 'text-slate-400'
 
   const badgeBg = isDetected ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-600'
@@ -332,6 +358,7 @@ function DetailPanel({
     : type === 'bandit_camp' ? 'bg-red-500/10 border-red-500/20 text-red-600'
     : type === 'debris_field' ? 'bg-slate-400/10 border-slate-400/15 text-slate-500'
     : type === 'world_boss' ? 'bg-fuchsia-500/10 border-fuchsia-500/25 text-fuchsia-500'
+    : type === 'anomaly' ? 'bg-cyan-500/10 border-cyan-400/25 text-cyan-400'
     : 'bg-slate-600/10 border-slate-600/20 text-slate-500'
 
   const description = isDetected
@@ -352,6 +379,14 @@ function DetailPanel({
               ? `${(entry.name ?? 'Apex threat')} — HP ${(meta as Record<string, unknown>)?.hp_remaining as number}/${(meta as Record<string, unknown>)?.hp_max as number}. Coordinate with other commanders!`
             : type === 'world_boss'
               ? `A high-threat hostile (${(meta?.tier as string) ?? 'unknown'} tier). Raid with a capable fleet to claim rare loot.`
+            : type === 'anomaly'
+              ? (() => {
+                  const at = meta?.anomaly_type as AnomalyType | undefined
+                  const cfg = at ? ANOMALIES[at] : undefined
+                  return cfg
+                    ? `${cfg.flavor} First fleet to arrive claims it — others return empty-handed.`
+                    : 'A strange signal. First fleet to arrive claims whatever is here.'
+                })()
               : ''
 
   const size = (meta?.size as string) ?? 'medium'
@@ -451,6 +486,16 @@ function DetailPanel({
                 <div className="text-[13px] font-semibold text-fuchsia-400 capitalize">{(meta?.tier as string) ?? '?'}</div>
               </div>
             )}
+            {!isDetected && type === 'anomaly' && (() => {
+              const at = meta?.anomaly_type as AnomalyType | undefined
+              const cfg = at ? ANOMALIES[at] : undefined
+              return (
+                <div>
+                  <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Type</div>
+                  <div className="text-[13px] font-semibold text-cyan-300">{cfg?.name ?? 'Unknown'}</div>
+                </div>
+              )
+            })()}
             <div>
               <div className="text-[8px] text-slate-600 uppercase tracking-wide mb-0.5">Coordinates</div>
               <div className="text-[12px] font-medium text-slate-300 font-mono">{entry.coordinates}</div>
@@ -520,6 +565,15 @@ function DetailPanel({
               style={{ background: 'linear-gradient(135deg, #a21caf, #6b21a8)', boxShadow: '0 2px 8px rgba(162,28,175,0.3)' }}
             >
               Engage Boss
+            </button>
+          )}
+          {!isDetected && type === 'anomaly' && (
+            <button
+              onClick={() => onNavigateMission(entry.coordinates, 'expedition')}
+              className="w-full py-2 text-[11px] font-semibold rounded-lg text-white transition-colors"
+              style={{ background: 'linear-gradient(135deg, #0891b2, #155e75)', boxShadow: '0 2px 8px rgba(34,211,238,0.3)' }}
+            >
+              Launch Expedition
             </button>
           )}
           {!isDetected && type === 'debris_field' && (
@@ -1020,6 +1074,23 @@ export function GalaxyMapPage() {
     }
   }
 
+  const handleSpawnAnomaly = async () => {
+    setSending(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('game-action', {
+        body: { action: 'spawn_anomaly', planetId: planet.id, devMode: true },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      console.log(`%c[Anomaly spawned]%c ${data.anomaly_type} at ${data.coordinates}`, 'color:#22d3ee;font-weight:bold', 'color:inherit')
+      await refetch()
+    } catch (err) {
+      console.error('Failed to spawn anomaly:', err)
+    } finally {
+      setSending(false)
+    }
+  }
+
   const handleSpawnOpponent = async () => {
     setSending(true)
     try {
@@ -1121,6 +1192,15 @@ export function GalaxyMapPage() {
               className="px-3 py-1.5 text-[10px] font-medium rounded bg-fuchsia-600/20 border border-fuchsia-500/30 text-fuchsia-400 hover:bg-fuchsia-600/30 disabled:opacity-40 transition-colors"
             >
               Spawn World Boss
+            </button>
+          )}
+          {IS_DEV_MODE && (
+            <button
+              onClick={handleSpawnAnomaly}
+              disabled={sending}
+              className="px-3 py-1.5 text-[10px] font-medium rounded bg-cyan-600/20 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-600/30 disabled:opacity-40 transition-colors"
+            >
+              Spawn Anomaly
             </button>
           )}
           {IS_DEV_MODE && (
