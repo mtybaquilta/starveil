@@ -1,4 +1,4 @@
-export type MissionType = 'mining' | 'raid' | 'salvage'
+export type MissionType = 'mining' | 'raid' | 'salvage' | 'expedition'
 
 export type MissionConfig = {
   type: MissionType
@@ -33,6 +33,14 @@ export const MISSION_TYPES: MissionConfig[] = [
     description: 'Send cargo ships to an abandoned or cleared location to recover drifting resources and wreckage.',
     icon: '🛸',
     requiredShips: ['small_cargo'],
+    minDurationSeconds: 60,
+  },
+  {
+    type: 'expedition',
+    name: 'Expedition',
+    description: 'Investigate an anomaly. First fleet to arrive claims whatever is inside — others return empty-handed.',
+    icon: '🌀',
+    requiredShips: ['small_fighter', 'small_cargo', 'harvester'],
     minDurationSeconds: 60,
   },
 ]
