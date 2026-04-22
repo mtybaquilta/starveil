@@ -10,9 +10,9 @@ Status legend: **[ ]** not started · **[~]** in progress · **[x]** shipped · 
 
 Prioritized for upcoming work. More context to be added before scoping.
 
-- **[ ] Multi-planet production overview** — see *Depth to existing systems*.
+- **[x] Multi-planet production overview** — shipped 2026-04-22.
 - **[ ] Espionage** — see *Strategic texture*.
-- **[ ] Anomalies / expeditions** — see *New PvE content*.
+- **[x] Anomalies / expeditions** — shipped 2026-04-22 (v1 dev-triggered, 5 anomaly types).
 
 ---
 
